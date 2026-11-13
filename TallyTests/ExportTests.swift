@@ -49,6 +49,16 @@ final class ExportTests: XCTestCase {
         XCTAssertThrowsError(try DrinkExportService.importDrinks(encode(backup), into: container.mainContext))
         XCTAssertEqual(try container.mainContext.fetchCount(FetchDescriptor<SavedDrink>()), 0)
     }
+    func testEveryValidEditorTextCanBeExported() throws {
+        var draft = DrinkDraft()
+        draft.name = String(repeating: "Coffee ", count: 50)
+        draft.brand = String(repeating: "Location ", count: 100)
+        draft.notes = String(repeating: "A useful note. ", count: 1_000)
+        let drink = try draft.makeDrink()
+        let restored = try DrinkExportService.decode(DrinkExportService.export([drink]))
+        XCTAssertEqual(restored.first?.name, drink.name)
+        XCTAssertEqual(restored.first?.notes, drink.notes)
+    }
     private func encode(_ backup: SavedDrinkBackup) throws -> Data {
         let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601
         return try encoder.encode(backup)

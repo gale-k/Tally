@@ -23,9 +23,8 @@ struct SavedDrinkRecord: Codable {
         createdAt = drink.createdAt; updatedAt = drink.updatedAt
     }
     func validate() throws {
-        guard DrinkDraft.optionalText(name) != nil, name.count <= 200,
-              (brandOrLocation?.count ?? 0) <= 500, (size?.count ?? 0) <= 200,
-              (notes?.count ?? 0) <= 10_000, createdAt.timeIntervalSince1970.isFinite,
+        // Match the editor's accepted text domain; the file-size bound already limits import resources.
+        guard DrinkDraft.optionalText(name) != nil, createdAt.timeIntervalSince1970.isFinite,
               updatedAt.timeIntervalSince1970.isFinite else { throw LibraryTransferError.invalidRecord }
         if let volumeMl, !volumeMl.isFinite || volumeMl <= 0 || volumeMl > 100_000 { throw DrinkValidationError.invalidVolume }
         try nutrition.validate()
