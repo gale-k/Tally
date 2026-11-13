@@ -1,7 +1,7 @@
 import SwiftUI
 import SwiftData
 
-/// One-off drinks go directly to Health. A reusable template is an optional, separate local save after success.
+/// One-off entries go directly to Health. A reusable template is an optional, separate local save after success.
 struct QuickAddView: View {
     @Environment(HealthKitManager.self) private var health
     @Environment(\.modelContext) private var context
@@ -19,15 +19,15 @@ struct QuickAddView: View {
             NutritionFormSection(draft: $draft)
             Section {
                 DatePicker("Date & Time", selection: $date, in: ...Date.now)
-                Toggle("Save as reusable drink", isOn: $saveReusable)
-            } footer: { Text("Without a name, this will be called ‘Quick drink’. Unknown nutrition stays blank.") }
+                Toggle("Save as reusable item", isOn: $saveReusable)
+            } footer: { Text("Without a name, this will be called ‘Quick entry’. Unknown nutrition stays blank.") }
             Section {
                 Button {
                     if savedToHealth { dismiss() } else { Task { await log() } }
                 } label: {
                     HStack { Spacer(); if saving { ProgressView() }; Text(savedToHealth ? "Done" : "Log to Apple Health"); Spacer() }
                 }
-                .buttonStyle(.borderedProminent).listRowBackground(Color.clear).disabled(saving)
+                .buttonStyle(.borderedProminent).foregroundStyle(Color(.systemBackground)).listRowBackground(Color.clear).disabled(saving)
                 .accessibilityIdentifier("quickLogToHealth")
             }
             if savedToHealth { Section { Label("Saved to Apple Health", systemImage: "checkmark.circle.fill").foregroundStyle(.green) } }
@@ -36,7 +36,7 @@ struct QuickAddView: View {
         .navigationTitle("Quick Add").navigationBarTitleDisplayMode(.inline)
         .toolbar { ToolbarItem(placement: .cancellationAction) { Button(savedToHealth ? "Done" : "Cancel") { dismiss() }.disabled(saving) } }
         .interactiveDismissDisabled(saving)
-        .errorAlert($error, title: savedToHealth ? "Saved, with a local update issue" : "Couldn’t log drink")
+        .errorAlert($error, title: savedToHealth ? "Saved, with a local update issue" : "Couldn’t log item")
     }
     @MainActor private func log() async {
         guard !saving, !savedToHealth else { return }
@@ -45,7 +45,7 @@ struct QuickAddView: View {
         do {
             try draft.validate(requireName: false)
             let nutrition = try draft.nutrition()
-            let name = DrinkDraft.optionalText(draft.name) ?? "Quick drink"
+            let name = DrinkDraft.optionalText(draft.name) ?? "Quick entry"
             try await health.log(.init(name: name, nutrition: nutrition, date: date))
             savedToHealth = true
             UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -56,7 +56,7 @@ struct QuickAddView: View {
                     let drink = try DrinkLibrary.save(reusable, in: context)
                     try DrinkLibrary.recordLog(for: drink, at: date, in: context)
                 } catch {
-                    self.error = "Your drink is saved in Apple Health. Tally couldn’t finish saving the reusable template. Don’t log it again. \(error.localizedDescription)"
+                    self.error = "Your entry is saved in Apple Health. Tally couldn’t finish saving the reusable template. Don’t log it again. \(error.localizedDescription)"
                     return
                 }
             }

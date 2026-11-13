@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// A generous hit area and an uncluttered caffeine-first summary make a usual drink easy to find one-handed.
+/// A generous hit area and known nutrition make a usual item easy to find one-handed.
 /// Secondary grouped surfaces preserve rounded-card separation in dark appearance.
 struct DrinkCard: View {
     let drink: SavedDrink
@@ -17,8 +17,15 @@ struct DrinkCard: View {
                     if let brand = drink.brandOrLocation { Text(brand).font(.caption).foregroundStyle(.secondary) }
                     Text(drink.name).font(.headline).foregroundStyle(.primary).lineLimit(2)
                 }
-                Text(drink.nutrition.formatted(.caffeine) ?? "Caffeine unknown")
-                    .font(.subheadline.weight(.medium)).foregroundStyle(.primary).monospacedDigit()
+                // A compact summary adapts to whichever nutrients are actually known.
+                if drink.nutrition.isEmpty {
+                    Text("Nutrition not added").font(.subheadline).foregroundStyle(.secondary)
+                } else {
+                    ForEach(drink.nutrition.summaryNutrients) { nutrient in
+                        Text(drink.nutrition.summaryLabel(nutrient))
+                            .font(.subheadline.weight(.medium)).foregroundStyle(.primary).monospacedDigit()
+                    }
+                }
                 if let size = drink.size { Text(size).font(.caption).foregroundStyle(.secondary) }
             }
             .frame(maxWidth: .infinity, minHeight: 130, alignment: .topLeading)
@@ -28,7 +35,7 @@ struct DrinkCard: View {
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
-        .accessibilityHint("Review and confirm logging this drink to Apple Health")
+        .accessibilityHint("Review and confirm logging this item to Apple Health")
     }
 }
 

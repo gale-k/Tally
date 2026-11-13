@@ -44,17 +44,17 @@ struct SavedDrinkBackup: Codable {
 struct DrinkImportReport {
     var imported: Int
     var skipped: Int
-    var message: String { "Imported \(imported) \(imported == 1 ? "drink" : "drinks"). \(skipped) already in your library. Existing drinks were kept unchanged." }
+    var message: String { "Imported \(imported) \(imported == 1 ? "item" : "items"). \(skipped) already in your library. Existing items were kept unchanged." }
 }
 
 enum LibraryTransferError: LocalizedError {
     case tooLarge, unsupportedVersion, duplicateIdentifiers, invalidRecord, pendingChanges
     var errorDescription: String? {
         switch self {
-        case .tooLarge: "Choose a Tally JSON library smaller than 5 MB with no more than 5,000 drinks."
+        case .tooLarge: "Choose a Tally JSON library smaller than 5 MB with no more than 5,000 items."
         case .unsupportedVersion: "This library uses an unsupported format version. Update Tally or use a version 1 export."
-        case .duplicateIdentifiers: "The file contains duplicate drink identifiers. No drinks were imported."
-        case .invalidRecord: "A drink has missing or invalid information. No drinks were imported."
+        case .duplicateIdentifiers: "The file contains duplicate item identifiers. No items were imported."
+        case .invalidRecord: "An item has missing or invalid information. No items were imported."
         case .pendingChanges: "Finish saving your current changes before importing a library."
         }
     }

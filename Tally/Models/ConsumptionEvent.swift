@@ -99,7 +99,7 @@ enum HealthAggregation {
             let first = ordered[0]
             let own = first.sourceBundle == ownBundle
             return ConsumptionEvent(id: key, date: first.date,
-                                    name: first.drinkName ?? (own ? "Drink" : first.nutrient.title),
+                                    name: first.drinkName ?? (own ? "Nutrition entry" : first.nutrient.title),
                                     brand: own ? first.brand : nil, size: own ? first.size : nil,
                                     sourceName: first.sourceName, isFromTally: own, nutrition: try totals(records))
         }.sorted { $0.date == $1.date ? $0.id < $1.id : $0.date > $1.date }

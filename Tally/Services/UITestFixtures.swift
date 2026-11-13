@@ -30,6 +30,7 @@ final class FixtureNutritionStore: NutritionStore {
             // Stable relative dates keep these explicitly synthetic fixtures useful on any test day.
             events += [
                 .init(name: "Iced Mocha", brand: "Fuel", nutrition: .init(caffeine: 100, calories: 220, sugar: 24, estimated: [.caffeine]), date: start.addingTimeInterval(60)),
+                .init(name: "Lunch Bowl", nutrition: .init(calories: 380, carbohydrates: 42, protein: 24, fibre: 6, estimated: [.calories]), date: start.addingTimeInterval(90)),
                 .init(name: "Grande Caffè Latte", brand: "Starbucks", nutrition: .init(caffeine: 125), date: start.addingTimeInterval(120))
             ]
             for offset in 1...6 {

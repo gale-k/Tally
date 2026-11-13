@@ -59,6 +59,31 @@ final class ExportTests: XCTestCase {
         XCTAssertEqual(restored.first?.name, drink.name)
         XCTAssertEqual(restored.first?.notes, drink.notes)
     }
+    func testLiteralLegacyVersionOneFileStillImports() throws {
+        // A fixed pre-theme export guards the original key names and raw values independently of today's encoder.
+        let legacy = Data(#"""
+        {"version":1,"drinks":[{"id":"4E93230F-C553-448F-82CE-8EE829BB0A53","name":"Legacy Coffee","brandOrLocation":"Fuel","size":"Iced","volumeMl":470,"category":"coffee","servingStyle":"iced","nutrition":{"caffeine":100,"estimated":["caffeine"]},"isFavourite":true,"createdAt":"2026-11-01T10:00:00Z","updatedAt":"2026-11-01T10:00:00Z"}]}
+        """#.utf8)
+        let container = try ModelContainer(for: SavedDrink.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        XCTAssertEqual(try DrinkExportService.importDrinks(legacy, into: container.mainContext).imported, 1)
+        let item = try XCTUnwrap(container.mainContext.fetch(FetchDescriptor<SavedDrink>()).first)
+        XCTAssertEqual(item.category, .coffee)
+        XCTAssertEqual(item.servingStyle, .iced)
+        XCTAssertEqual(item.volumeMl, 470)
+        XCTAssertEqual(item.nutrition.formatted(.caffeine), "~100 mg")
+        XCTAssertTrue(item.isFavourite)
+        XCTAssertNil(item.proteinG)
+    }
+    func testFoodCategoriesRoundTripWithoutChangingVersionOneKeys() throws {
+        for category in [DrinkCategory.meal, .snack, .fruitVegetables, .dairyAlternatives] {
+            let food = SavedDrink(name: "Food", category: category, nutrition: .init(calories: 250, protein: 18, estimated: [.protein]))
+            let restored = try XCTUnwrap(DrinkExportService.decode(DrinkExportService.export([food])).first).makeDrink()
+            XCTAssertEqual(restored.category, category)
+            XCTAssertEqual(restored.servingStyle, .other)
+            XCTAssertNil(restored.caffeineMg)
+            XCTAssertEqual(restored.nutrition, food.nutrition)
+        }
+    }
     private func encode(_ backup: SavedDrinkBackup) throws -> Data {
         let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601
         return try encoder.encode(backup)

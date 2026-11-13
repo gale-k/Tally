@@ -1,5 +1,6 @@
 import SwiftUI
 
+/// Prominent buttons use an adaptive foreground to contrast with the light/dark accent.
 /// Permission-sheet completion and readable data are intentionally different concepts in the UI.
 /// Secondary grouped surfaces preserve rounded-card separation in dark appearance.
 struct HealthAccessCard: View {
@@ -8,9 +9,9 @@ struct HealthAccessCard: View {
     @State private var error: String?
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label(health.isAvailable ? "Your drinks, in Apple Health" : "Apple Health unavailable", systemImage: "heart.text.square")
+            Label(health.isAvailable ? "Your nutrition, in Apple Health" : "Apple Health unavailable", systemImage: "heart.text.square")
                 .font(.headline)
-            Text(health.isAvailable ? "Choose which nutrition Tally can read and save. Your library stays on this device." : "You can still create and organise saved drinks on this device.")
+            Text(health.isAvailable ? "Choose which nutrition Tally can read and save. Your library stays on this device." : "You can still create and organise saved foods and drinks on this device.")
                 .font(.subheadline).foregroundStyle(.secondary)
             if health.isAvailable {
                 Button {
@@ -21,7 +22,7 @@ struct HealthAccessCard: View {
                     }
                 } label: {
                     HStack { if requesting { ProgressView() }; Text("Choose Health Access") }
-                }.buttonStyle(.borderedProminent).disabled(requesting).accessibilityIdentifier("chooseHealthAccess")
+                }.buttonStyle(.borderedProminent).foregroundStyle(Color(.systemBackground)).disabled(requesting).accessibilityIdentifier("chooseHealthAccess")
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading).padding(18)

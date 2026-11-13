@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Each day's totals include exactly its visible samples; only Tally-owned samples are reconstructed as multi-nutrient drinks.
+/// Each day's totals include exactly its visible samples; only Tally-owned samples are reconstructed as multi-nutrient events.
 struct HistoryView: View {
     @Environment(HealthKitManager.self) private var health
     @State private var selected: ConsumptionEvent?
@@ -20,15 +20,13 @@ struct HistoryView: View {
                 } header: {
                     VStack(alignment: .leading, spacing: 5) {
                         Text(day.date.formatted(.dateTime.weekday(.wide).day().month(.wide)))
-                        Text([Nutrient.caffeine, .calories, .sugar].compactMap { nutrient in
-                            day.totals.formatted(nutrient).map { "\(nutrient.title): \($0)" }
-                        }.joined(separator: " · ")).font(.caption).textCase(nil)
+                        Text(day.totals.summaryText).font(.caption).textCase(nil)
                     }
                 }
             }
             if health.historyDays.isEmpty {
                 ContentUnavailableView(health.isLoading ? "Reading Apple Health…" : "No visible nutrition yet", systemImage: "clock",
-                                       description: Text("Log a drink, pull to refresh, or review Tally’s read permissions in Health. An empty result doesn’t tell us whether read access was granted."))
+                                       description: Text("Log food or a drink, pull to refresh, or review Tally’s read permissions in Health. An empty result doesn’t tell us whether read access was granted."))
                     .listRowBackground(Color.clear)
             }
         }
@@ -49,10 +47,8 @@ struct HistoryEventRow: View {
                 Text(event.date.formatted(date: .omitted, time: .shortened)).font(.caption).foregroundStyle(.secondary)
             }
             if let brand = event.brand { Text(brand).font(.subheadline).foregroundStyle(.secondary) }
-            Text([Nutrient.caffeine, .calories, .sugar].compactMap { nutrient in
-                event.nutrition.formatted(nutrient).map { "\($0)\(nutrient == .caffeine ? " caffeine" : nutrient == .sugar ? " sugar" : "")" }
-            }.joined(separator: " · ")).font(.subheadline).monospacedDigit()
-            Label(event.sourceName, systemImage: event.isFromTally ? "cup.and.saucer" : "heart")
+            Text(event.nutrition.summaryText).font(.subheadline).monospacedDigit()
+            Label(event.sourceName, systemImage: event.isFromTally ? "list.bullet.clipboard" : "heart")
                 .font(.caption).foregroundStyle(.secondary)
         }.padding(.vertical, 6).contentShape(Rectangle()).accessibilityElement(children: .combine)
     }
@@ -66,13 +62,13 @@ struct HistoryEventDetail: View {
             Section {
                 Text(event.name).font(.title2.weight(.semibold))
                 if let brand = event.brand { LabeledContent("Brand / Location", value: brand) }
-                if let size = event.size { LabeledContent("Size", value: size) }
+                if let size = event.size { LabeledContent("Serving size", value: size) }
                 LabeledContent("Date", value: event.date.formatted(date: .abbreviated, time: .shortened))
                 LabeledContent("Source", value: event.sourceName)
             }
             Section("Visible nutrition") { NutritionSummaryView(nutrition: event.nutrition) }
             Section {
-                Text("This record is read from Apple Health. Saved drink edits and deletions never change this history. ~ means estimated.")
+                Text("This record is read from Apple Health. Saved template edits and deletions never change this history. ~ means estimated.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
         }.navigationTitle("Health Entry").navigationBarTitleDisplayMode(.inline)

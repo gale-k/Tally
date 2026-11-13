@@ -101,6 +101,26 @@ final class HealthTests: XCTestCase {
         XCTAssertThrowsError(try ConsumptionDraft(name: "Coffee", nutrition: .init(caffeine: 100), date: Date.now.addingTimeInterval(3_600)).validate())
         XCTAssertThrowsError(try ConsumptionDraft(name: "Unknown", nutrition: .init()).validate())
     }
+    @MainActor
+    func testFoodWritesOnlyKnownNutrientsAndKeepsItsName() throws {
+        let food = ConsumptionDraft(name: "Lunch Bowl", nutrition: .init(calories: 380, sugar: 0, protein: 24, estimated: [.protein]))
+        let samples = try HealthKitStore.makeSamples(for: food)
+        XCTAssertEqual(samples.count, 3)
+        XCTAssertFalse(samples.contains { $0.quantityType == Nutrient.caffeine.healthType })
+        let protein = try XCTUnwrap(samples.first { $0.quantityType == Nutrient.protein.healthType })
+        XCTAssertEqual(protein.quantity.doubleValue(for: .gram()), 24)
+        XCTAssertEqual(protein.metadata?[HKMetadataKeyFoodType] as? String, "Lunch Bowl")
+        XCTAssertEqual(protein.metadata?[HealthKitStore.estimatedKey] as? Bool, true)
+        XCTAssertTrue(samples.allSatisfy { $0.startDate == food.date })
+    }
+    func testHistoricalNameAndLegacyGroupingRemainIntact() throws {
+        let date = Date.now
+        let samples = [record(.caffeine, 100, date), record(.calories, 220, date)]
+        let event = try XCTUnwrap(HealthAggregation.events(samples, ownBundle: "own").first)
+        XCTAssertEqual(event.name, "Coffee")
+        XCTAssertEqual(event.nutrition.calories, 220)
+        XCTAssertEqual(event.nutrition.caffeine, 100)
+    }
     private func record(_ nutrient: Nutrient, _ value: Double, _ date: Date, _ bundle: String = "own", _ event: String? = nil) -> HealthSample {
         .init(id: UUID(), nutrient: nutrient, value: value, date: date, sourceName: bundle, sourceBundle: bundle,
               eventID: event, drinkName: "Coffee", isEstimated: false)

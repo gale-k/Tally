@@ -10,6 +10,8 @@ struct TodayView: View {
     @AppStorage("dailyCaffeineTarget") private var storedTarget = 400.0
     @AppStorage("showCalories") private var showCalories = true
     @AppStorage("showSugar") private var showSugar = true
+    @AppStorage("showProtein") private var showProtein = true
+    @AppStorage("showCaffeine") private var showCaffeine = true
     @State private var sheet: DrinkSheet?
     let openLibrary: () -> Void
     private var target: Double { storedTarget.isFinite && storedTarget > 0 ? storedTarget : 400 }
@@ -19,13 +21,17 @@ struct TodayView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 Text(Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide)))
-                    .font(.subheadline).foregroundStyle(.secondary)
+                    // The date sits directly on the grouped background; primary text keeps its contrast sufficient.
+                    .font(.subheadline).foregroundStyle(.primary)
                 if !health.permissionsRequested || !health.isAvailable { HealthAccessCard() }
-                CaffeineSummaryCard(nutrition: health.today, target: target)
-                if showCalories || showSugar {
+                // Equal-weight cards avoid treating caffeine as a required part of every diet entry.
+                if showCalories || showProtein || showSugar || showCaffeine {
+                    Text("Nutrition Today").font(.title2.weight(.semibold))
                     LazyVGrid(columns: columns, spacing: 12) {
                         if showCalories { SecondaryNutritionCard(nutrient: .calories, nutrition: health.today) }
+                        if showProtein { SecondaryNutritionCard(nutrient: .protein, nutrition: health.today) }
                         if showSugar { SecondaryNutritionCard(nutrient: .sugar, nutrition: health.today) }
+                        if showCaffeine { CaffeineSummaryCard(nutrition: health.today, target: target) }
                     }
                 }
                 if let error = health.queryError {
@@ -40,13 +46,13 @@ struct TodayView: View {
                 HStack {
                     Text("Quick Log").font(.title2.weight(.semibold))
                     Spacer()
-                    Button("All Drinks", action: openLibrary).font(.subheadline)
+                    Button("Library", action: openLibrary).font(.subheadline)
                 }
                 if drinks.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("A home for your usuals").font(.headline)
-                        Text("Save a drink once. The next one is just a couple of taps away.").font(.subheadline).foregroundStyle(.secondary)
-                        Button("Add Your First Drink") { sheet = .add }.buttonStyle(.borderedProminent)
+                        Text("Save a food or drink once. Log its known nutrition again in a couple of taps.").font(.subheadline).foregroundStyle(.secondary)
+                        Button("Add Your First Item") { sheet = .add }.buttonStyle(.borderedProminent).foregroundStyle(Color(.systemBackground))
                     }.frame(maxWidth: .infinity, alignment: .leading).padding(18)
                         .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
                 } else {
@@ -57,9 +63,9 @@ struct TodayView: View {
                     }
                 }
                 Button { sheet = .quickAdd } label: {
-                    Label("Quick Add a one-off drink", systemImage: "bolt.badge.plus").frame(maxWidth: .infinity, minHeight: 32)
+                    Label("Quick Add a one-off entry", systemImage: "bolt.badge.plus").frame(maxWidth: .infinity, minHeight: 32)
                 }.buttonStyle(.bordered)
-                CaffeineTrendView(days: health.caffeineDays)
+                if showCaffeine { CaffeineTrendView(days: health.caffeineDays) }
             }.padding(20)
         }
         .background(Color(.systemGroupedBackground))
@@ -69,8 +75,8 @@ struct TodayView: View {
                 if health.isLoading { ProgressView().accessibilityLabel("Refreshing Apple Health") }
                 Menu {
                     Button("Quick Add", systemImage: "bolt.badge.plus") { sheet = .quickAdd }
-                    Button("Add Saved Drink", systemImage: "plus") { sheet = .add }
-                } label: { Image(systemName: "plus") }.accessibilityLabel("Add a drink")
+                    Button("Add Saved Item", systemImage: "plus") { sheet = .add }
+                } label: { Image(systemName: "plus") }.accessibilityLabel("Add food or drink")
             }
         }
         .refreshable { await health.refresh() }
