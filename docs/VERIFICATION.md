@@ -1,4 +1,6 @@
-# Local verification
+# Initial app verification
+
+For the later general nutrition theme and compatibility checks, see [issue #2 verification](ISSUE_2_VERIFICATION.md). The results below record the original app implementation.
 
 Verification took place on Kai’s Mac on 13 November 2026. No GitHub-hosted Actions were triggered or used. Build products, logs, result bundles, SDK probes, and the isolated QA Simulator are task-local artifacts and are removed after the recorded checks. The two README screenshots are intentional documentation assets and contain synthetic data only.
 
