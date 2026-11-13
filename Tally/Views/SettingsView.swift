@@ -21,6 +21,8 @@ struct SettingsView: View {
     @State private var document: DrinkLibraryDocument?
     @State private var error: String?
     @State private var importMessage: String?
+    @State private var restoreCopies = false
+    @State private var pendingRestore: Data?
     #if DEBUG
     @AppStorage(DevelopmentData.marker) private var developmentSeeded = false
     #endif
@@ -64,18 +66,20 @@ struct SettingsView: View {
             } header: { Text("Apple Health") }
             footer: { Text("Health keeps read permissions private. No visible samples can mean no data or restricted access. Allow every known nutrient when logging an item; otherwise nothing in that event is saved.") }
 
+            CloudLibrarySection()
             Section {
-                Button("Export Library", systemImage: "square.and.arrow.up") {
+                Button("Export Library Snapshot", systemImage: "square.and.arrow.up") {
                     do { document = DrinkLibraryDocument(data: try DrinkExportService.export(drinks)); exporting = true }
                     catch { self.error = error.localizedDescription }
                 }
-                Button("Import Library", systemImage: "square.and.arrow.down") { importing = true }
-            } header: { Text("Data") }
-            footer: { Text("JSON contains saved templates and favourites only, never Apple Health history. Import adds missing items and leaves existing items unchanged.") }
+                Button("Import Library", systemImage: "square.and.arrow.down") { restoreCopies = false; importing = true }
+                Button("Restore Snapshot as New Copies", systemImage: "clock.arrow.circlepath") { restoreCopies = true; importing = true }
+            } header: { Text("Backups & Restore") }
+            footer: { Text("Export creates an independent JSON snapshot. Choose iCloud Drive in Files to keep a recovery copy there. This is a manual backup, separate from live sync. Import adds missing templates and keeps existing ones unchanged. Health history is excluded.") }
             Section("About") {
                 Label("Tally", systemImage: "list.bullet.clipboard.fill").font(.headline)
-                Text("Saved foods and drinks are stored locally on this device. Logged nutrition is saved to Apple Health.")
-                Text("No accounts, advertising, analytics, or Tally cloud syncing.").font(.footnote).foregroundStyle(.secondary)
+                Text("Saved templates are available on this device, with optional private iCloud sync. Logged nutrition is saved to Apple Health.")
+                Text("No Tally account, advertising, analytics, or custom server.").font(.footnote).foregroundStyle(.secondary)
                 LabeledContent("Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")
             }
             #if DEBUG
@@ -99,9 +103,21 @@ struct SettingsView: View {
         .fileImporter(isPresented: $importing, allowedContentTypes: [.json]) { result in
             do {
                 let url = try result.get()
-                importMessage = try DrinkExportService.importDrinks(DrinkExportService.readFile(url), into: context).message
+                let data = try DrinkExportService.readFile(url)
+                if restoreCopies {
+                    _ = try DrinkExportService.decode(data)
+                    pendingRestore = data
+                } else { importMessage = try DrinkExportService.importDrinks(data, into: context).message }
             } catch { if (error as NSError).code != NSUserCancelledError { self.error = "Couldn’t import this library. \(error.localizedDescription)" } }
         }
+        // Capture the selected snapshot independently of the dialog dismissal lifecycle.
+        .confirmationDialog("Restore Snapshot as New Copies?", isPresented: Binding(get: { pendingRestore != nil }, set: { if !$0 { pendingRestore = nil } }), titleVisibility: .visible, presenting: pendingRestore) { data in
+            Button("Restore Copies") {
+                do { importMessage = try DrinkExportService.importDrinks(data, into: context, mode: .restoreCopies).message }
+                catch { self.error = error.localizedDescription }
+                pendingRestore = nil
+            }
+        } message: { _ in Text("Every template in this snapshot will be added as a new copy. You may see duplicates. Existing templates and Apple Health history will not be changed.") }
         .alert("Library imported", isPresented: Binding(get: { importMessage != nil }, set: { if !$0 { importMessage = nil } })) {
             Button("Done") { importMessage = nil }
         } message: { Text(importMessage ?? "") }

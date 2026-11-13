@@ -25,7 +25,7 @@ enum DevelopmentData {
                        nutrition: .init(caffeine: 0, estimated: [.caffeine]))
         ]
         do {
-            for drink in drinks { context.insert(drink) }
+            for drink in drinks { context.insert(drink); try LibrarySyncStore.stage(drink, in: context) }
             try context.save()
             // Mark only a successful batch, so a failed save can be retried without partial seeds.
             defaults?.set(true, forKey: marker)

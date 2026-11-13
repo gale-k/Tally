@@ -10,17 +10,22 @@ enum DrinkLibrary {
             let result: SavedDrink
             if let drink { try draft.apply(to: drink); result = drink }
             else { result = try draft.makeDrink(); context.insert(result) }
+            try LibrarySyncStore.stage(result, in: context)
             try context.save()
             return result
         } catch { context.rollback(); throw error }
     }
     static func delete(_ drink: SavedDrink, in context: ModelContext) throws {
         // Intentionally no HealthKit call: removing a template never removes consumption history.
-        do { context.delete(drink); try context.save() }
+        do { try LibrarySyncStore.stageDeletion(drink.id, in: context); context.delete(drink); try context.save() }
         catch { context.rollback(); throw error }
     }
     static func toggleFavourite(_ drink: SavedDrink, in context: ModelContext) throws {
-        do { drink.isFavourite.toggle(); drink.updatedAt = .now; try context.save() }
+        do {
+            drink.isFavourite.toggle(); drink.updatedAt = .now
+            try LibrarySyncStore.stage(drink, in: context)
+            try context.save()
+        }
         catch { context.rollback(); throw error }
     }
     @discardableResult

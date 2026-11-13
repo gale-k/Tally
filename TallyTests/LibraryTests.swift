@@ -5,7 +5,7 @@ import SwiftData
 @MainActor
 final class LibraryTests: XCTestCase {
     func testCreateEditDuplicateDeleteAndUsage() throws {
-        let container = try ModelContainer(for: SavedDrink.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let container = try LibraryStore.container(configuration: ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none))
         let context = container.mainContext
         context.autosaveEnabled = false
         var draft = DrinkDraft()
@@ -36,7 +36,7 @@ final class LibraryTests: XCTestCase {
     }
     #if DEBUG
     func testDevelopmentExamplesNeverInventUnknownNutrition() throws {
-        let container = try ModelContainer(for: SavedDrink.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let container = try LibraryStore.container(configuration: ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none))
         try DevelopmentData.seed(in: container.mainContext, defaults: nil)
         let drinks = try container.mainContext.fetch(FetchDescriptor<SavedDrink>())
         XCTAssertEqual(drinks.count, 6)
@@ -55,7 +55,7 @@ final class LibraryTests: XCTestCase {
         let suite = "TallySeed-\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
-        let container = try ModelContainer(for: SavedDrink.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let container = try LibraryStore.container(configuration: ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none))
         defaults.set(true, forKey: "developmentPresetsSeeded.v1")
         try DevelopmentData.seed(in: container.mainContext, defaults: defaults)
         XCTAssertEqual(try container.mainContext.fetchCount(FetchDescriptor<SavedDrink>()), 0)

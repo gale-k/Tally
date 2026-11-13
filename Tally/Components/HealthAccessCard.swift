@@ -11,7 +11,7 @@ struct HealthAccessCard: View {
         VStack(alignment: .leading, spacing: 12) {
             Label(health.isAvailable ? "Your nutrition, in Apple Health" : "Apple Health unavailable", systemImage: "heart.text.square")
                 .font(.headline)
-            Text(health.isAvailable ? "Choose which nutrition Tally can read and save. Your library stays on this device." : "You can still create and organise saved foods and drinks on this device.")
+            Text(health.isAvailable ? "Choose which nutrition Tally can read and save. Your saved library stays available on this device." : "You can still create and organise saved foods and drinks on this device.")
                 .font(.subheadline).foregroundStyle(.secondary)
             if health.isAvailable {
                 Button {

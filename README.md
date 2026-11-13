@@ -8,7 +8,8 @@ A native iPhone nutrition utility for saving your usual foods and drinks and log
 - Find a saved item with search, category filters, five sort orders, and ranked Quick Log cards.
 - Review an item and its time before logging, or use Quick Add for a one-off entry.
 - Choose calorie, protein, sugar, and caffeine summaries on Today, with recent Health history and an optional seven-day caffeine chart.
-- Export and import the local template library as JSON.
+- Optionally sync saved templates through your private iCloud storage, with offline edits and explicit account-switch control.
+- Export independent JSON snapshots to Files/iCloud Drive; import missing items or restore older snapshots as new copies.
 
 Supported nutrition: caffeine (mg), energy (kcal), sugar, carbohydrates, protein, total fat, saturated fat, and fibre (g). **Blank means unknown; zero is a real value.** Tap `~` beside a nutrition field to mark it as estimated.
 
@@ -23,7 +24,7 @@ Local Simulator screenshots with synthetic test data, not personal Health histor
 ## Getting started
 
 1. Open `Tally.xcodeproj` in Xcode 27.0 or later. The project uses the installed iOS 27 SDK and requires iOS 27.0 or later.
-2. Select your Apple development team if necessary. HealthKit and its read/write purpose descriptions are already configured.
+2. Select your Apple development team. HealthKit, iCloud/CloudKit, Push Notifications, remote-notification background mode, and Health purpose descriptions are configured. Create/select `iCloud.gale-k.Tally` in Signing & Capabilities and regenerate provisioning for these capabilities. See [iCloud setup](docs/ICLOUD_SYNC.md#developer-setup).
 3. Build and run on an iPhone. Add a food or drink in **Library**, then tap it to review its nutrition and log time.
 4. Choose Health permissions when requested. Logging requires write access for every known nutrient in that entry; a denied field fails the entire event without saving partial nutrition.
 
@@ -39,20 +40,22 @@ Existing libraries and version-1 JSON exports continue to work. The internal `Sa
 
 ## Data and privacy
 
-Reusable food and drink templates live only in this device’s SwiftData store. Actual consumption is saved as independent HealthKit samples and queried from Apple Health. Editing or deleting a template never changes historical samples.
+Reusable food and drink templates remain available in this device’s SwiftData store. Optional iCloud sync sends template details, including nutrition, notes, and favourites, to your private CloudKit database after confirmation in Settings. Actual consumption is saved as independent HealthKit samples and queried from Apple Health. Editing or deleting a template never changes historical samples.
 
 Today’s totals and history show **visible Apple Health nutrition from all sources**, including other apps and foods. They are not presented as drinks-only totals. Empty results cannot establish whether read permission was denied. Limited-history access is respected. Pull to refresh, or return to Tally after changing data or permissions in Health.
 
 The default 400 mg caffeine target is a personal tracking preference, not a medical recommendation. Change it in Settings.
 
-Tally contains no networking, backend, accounts, ads, analytics, or cloud template syncing. Apple Health’s own system-managed sync and backup settings are controlled separately by the user. A JSON export is an explicit user-directed Files action and contains templates only, excluding consumption dates, usage counts, and Health history. Imports add missing UUIDs and keep existing templates unchanged.
+Tally has no custom backend, Tally account, ads, or analytics. The only app-managed network transfer is optional template sync through Apple CloudKit. Preferences, convenience usage counts/dates, and Health permission state stay local. Apple Health’s own system-managed sync and backup settings are controlled separately by the user.
 
-See [the data and architecture notes](docs/DATA_AND_ARCHITECTURE.md) for event grouping, save boundaries, and the JSON contract, and [local verification](docs/VERIFICATION.md) for the initial app checks. The [general nutrition verification](docs/ISSUE_2_VERIFICATION.md) records the latest commands, results, and remaining manual Health/VoiceOver checks.
+Live sync propagates edits and deletions; it is not an independent backup. **Settings → Backups & Restore → Export Library Snapshot** creates a manual version-1 JSON snapshot. Choose iCloud Drive in Files to keep a recovery copy there. Imports add missing UUIDs and keep existing templates unchanged. **Restore Snapshot as New Copies** creates fresh identities after confirmation, allowing recovery of older versions without overwriting current templates. These actions exclude consumption dates, usage counts, and Health history. See [iCloud sync and recovery](docs/ICLOUD_SYNC.md) for conflicts, account changes, and recovery steps.
+
+See [the data and architecture notes](docs/DATA_AND_ARCHITECTURE.md) for event grouping, save boundaries, and the JSON contract, and [local verification](docs/VERIFICATION.md) for the initial app checks. The [general nutrition verification](docs/ISSUE_2_VERIFICATION.md) records the theme-change checks. [iCloud verification](docs/ISSUE_1_VERIFICATION.md) records the current local tests and outstanding signing, physical-device, and two-device checks.
 
 ## Development
 
-Swift 6, SwiftUI, SwiftData, HealthKit, and Swift Charts. Apple frameworks only; there are no third-party package dependencies.
+Swift 6, SwiftUI, SwiftData, CloudKit (`CKSyncEngine`), HealthKit, and Swift Charts. Apple frameworks only; there are no third-party package dependencies.
 
-Run all verification locally with isolated DerivedData under `/private/tmp`. No GitHub Actions workflow is configured. UI tests use an in-memory library and a synthetic Health adapter, never the real Health store.
+Run all verification locally with isolated DerivedData under `/private/tmp`. No GitHub Actions workflow is configured. UI tests use an in-memory library, a synthetic Health adapter, and disabled CloudKit access; they never contact the real Health store or iCloud.
 
 The neutral plate-and-tally icon has reproducible native drawing source in [Design/RenderAppIcon.swift](Design/RenderAppIcon.swift).
