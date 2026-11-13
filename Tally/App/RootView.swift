@@ -12,11 +12,7 @@ struct RootView: View {
                 }
             }
             Tab("Drinks", systemImage: "cup.and.saucer") {
-                NavigationStack {
-                    ContentUnavailableView("Your usuals, all together", systemImage: "mug",
-                                           description: Text("Save a drink once. Come back whenever you like."))
-                        .navigationTitle("Drinks")
-                }
+                NavigationStack { DrinksView() }
             }
             Tab("History", systemImage: "clock") {
                 NavigationStack { Text("Consumption history is read from Apple Health.").padding().navigationTitle("History") }

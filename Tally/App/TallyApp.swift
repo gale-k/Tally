@@ -4,6 +4,7 @@ import SwiftData
 /// Tally has one local-only container. A store error is shown instead of discarding the library.
 @main
 struct TallyApp: App {
+    @State private var health = HealthKitManager()
     private let container: ModelContainer?
     private let startupError: String?
 
@@ -11,6 +12,7 @@ struct TallyApp: App {
         do {
             let configuration = ModelConfiguration("Tally", cloudKitDatabase: .none)
             container = try ModelContainer(for: SavedDrink.self, configurations: configuration)
+            container?.mainContext.autosaveEnabled = false
             startupError = nil
         } catch {
             container = nil
@@ -21,7 +23,7 @@ struct TallyApp: App {
     var body: some Scene {
         WindowGroup {
             if let container {
-                RootView().modelContainer(container).tint(.brown)
+                RootView().modelContainer(container).environment(health).tint(Color.accentColor)
             } else {
                 ContentUnavailableView("Your library couldn’t open", systemImage: "externaldrive.badge.exclamationmark",
                                        description: Text(startupError ?? "Please reopen Tally to try again. Your library has not been reset."))

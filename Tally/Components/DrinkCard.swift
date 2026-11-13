@@ -1,0 +1,57 @@
+import SwiftUI
+
+/// A generous hit area and an uncluttered caffeine-first summary make a usual drink easy to find one-handed.
+struct DrinkCard: View {
+    let drink: SavedDrink
+    let action: () -> Void
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Image(systemName: drink.category.symbol).foregroundStyle(.tint)
+                    Spacer()
+                    if drink.isFavourite { Image(systemName: "star.fill").font(.caption).foregroundStyle(.tint) }
+                }.accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 3) {
+                    if let brand = drink.brandOrLocation { Text(brand).font(.caption).foregroundStyle(.secondary) }
+                    Text(drink.name).font(.headline).foregroundStyle(.primary).lineLimit(2)
+                }
+                Text(drink.nutrition.formatted(.caffeine) ?? "Caffeine unknown")
+                    .font(.subheadline.weight(.medium)).foregroundStyle(.primary).monospacedDigit()
+                if let size = drink.size { Text(size).font(.caption).foregroundStyle(.secondary) }
+            }
+            .frame(maxWidth: .infinity, minHeight: 130, alignment: .topLeading)
+            .padding(16)
+            .background(.background, in: RoundedRectangle(cornerRadius: 20))
+            .contentShape(RoundedRectangle(cornerRadius: 20))
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("Review and confirm logging this drink to Apple Health")
+    }
+}
+
+struct DrinkRow: View {
+    let drink: SavedDrink
+    @Environment(\.dynamicTypeSize) private var typeSize
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            Image(systemName: drink.category.symbol)
+                .font(.title3).foregroundStyle(.tint).frame(width: 42, height: 48)
+                .background(Color.accentColor.opacity(0.09), in: RoundedRectangle(cornerRadius: 12))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                if let brand = drink.brandOrLocation { Text(brand).font(.caption).foregroundStyle(.secondary) }
+                Text(drink.name).font(.headline).foregroundStyle(.primary)
+                if let size = drink.size { Text(size).font(.caption).foregroundStyle(.secondary) }
+                if typeSize.isAccessibilitySize { NutritionSummaryView(nutrition: drink.nutrition, compact: true) }
+            }
+            Spacer(minLength: 6)
+            if !typeSize.isAccessibilitySize { NutritionSummaryView(nutrition: drink.nutrition, compact: true) }
+            if drink.isFavourite { Image(systemName: "star.fill").font(.caption).foregroundStyle(.tint).accessibilityLabel("Favourite") }
+        }
+        .padding(.vertical, 6)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+    }
+}
