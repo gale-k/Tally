@@ -1,6 +1,7 @@
 import SwiftUI
 
 /// A generous hit area and an uncluttered caffeine-first summary make a usual drink easy to find one-handed.
+/// Secondary grouped surfaces preserve rounded-card separation in dark appearance.
 struct DrinkCard: View {
     let drink: SavedDrink
     let action: () -> Void
@@ -22,7 +23,7 @@ struct DrinkCard: View {
             }
             .frame(maxWidth: .infinity, minHeight: 130, alignment: .topLeading)
             .padding(16)
-            .background(.background, in: RoundedRectangle(cornerRadius: 20))
+            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
             .contentShape(RoundedRectangle(cornerRadius: 20))
         }
         .buttonStyle(.plain)

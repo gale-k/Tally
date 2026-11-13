@@ -57,6 +57,7 @@ struct HistoryDay: Identifiable, Sendable {
 struct CaffeineDay: Identifiable, Sendable {
     var date: Date
     var total: Double?
+    var isEstimated = false
     var id: Date { date }
 }
 
@@ -117,7 +118,8 @@ enum HealthAggregation {
         try (0..<count).reversed().map { offset in
             let date = calendar.date(byAdding: .day, value: -offset, to: calendar.startOfDay(for: now))!
             let range = DateWindows.day(containing: date, calendar: calendar)
-            return CaffeineDay(date: date, total: try totals(samples.filter { $0.nutrient == .caffeine && DateWindows.contains($0.date, in: range) }).caffeine)
+            let nutrition = try totals(samples.filter { $0.nutrient == .caffeine && DateWindows.contains($0.date, in: range) })
+            return CaffeineDay(date: date, total: nutrition.caffeine, isEstimated: nutrition.estimated.contains(.caffeine))
         }
     }
 }

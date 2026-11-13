@@ -88,6 +88,19 @@ final class HealthTests: XCTestCase {
         XCTAssertNotNil(manager.queryError)
         XCTAssertNil(manager.today.caffeine)
     }
+    func testTrendRetainsEstimatesAndDoesNotInventUnknownDays() throws {
+        let now = Date.now
+        var sample = record(.caffeine, 100, now.addingTimeInterval(-1))
+        sample.isEstimated = true
+        let days = try HealthAggregation.caffeineDays([sample], count: 2, now: now)
+        XCTAssertNil(days[0].total)
+        XCTAssertEqual(days[1].total, 100)
+        XCTAssertTrue(days[1].isEstimated)
+    }
+    func testFutureAndEmptyConsumptionAreRejected() {
+        XCTAssertThrowsError(try ConsumptionDraft(name: "Coffee", nutrition: .init(caffeine: 100), date: Date.now.addingTimeInterval(3_600)).validate())
+        XCTAssertThrowsError(try ConsumptionDraft(name: "Unknown", nutrition: .init()).validate())
+    }
     private func record(_ nutrient: Nutrient, _ value: Double, _ date: Date, _ bundle: String = "own", _ event: String? = nil) -> HealthSample {
         .init(id: UUID(), nutrient: nutrient, value: value, date: date, sourceName: bundle, sourceBundle: bundle,
               eventID: event, drinkName: "Coffee", isEstimated: false)

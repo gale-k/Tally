@@ -2,6 +2,7 @@ import SwiftUI
 import Charts
 
 /// Missing read data produces gaps, not invented zero-consumption days.
+/// Secondary grouped surfaces preserve rounded-card separation in dark appearance.
 struct CaffeineTrendView: View {
     let days: [CaffeineDay]
     @State private var selectedDate: Date?
@@ -23,7 +24,7 @@ struct CaffeineTrendView: View {
                             BarMark(x: .value("Day", day.date, unit: .day), y: .value("Caffeine", total))
                                 .foregroundStyle(Color.accentColor).cornerRadius(5)
                                 .accessibilityLabel(day.date.formatted(date: .abbreviated, time: .omitted))
-                                .accessibilityValue("\(total.formatted()) milligrams")
+                                .accessibilityValue("\(day.isEstimated ? "Approximately " : "")\(total.formatted()) milligrams")
                         }
                     }
                     if let selected {
@@ -34,7 +35,7 @@ struct CaffeineTrendView: View {
                 .chartXAxis { AxisMarks(values: .stride(by: .day)) { value in AxisValueLabel(format: .dateTime.weekday(.narrow)) } }
                 .frame(height: 150)
                 if let selected {
-                    Text("\(selected.date.formatted(.dateTime.weekday(.wide))) · \(selected.total.map { "\($0.formatted()) mg" } ?? "No visible data")")
+                    Text("\(selected.date.formatted(.dateTime.weekday(.wide))) · \(selected.total.map { "\(selected.isEstimated ? "~" : "")\($0.formatted()) mg" } ?? "No visible data")")
                         .font(.caption).foregroundStyle(.secondary).accessibilityAddTraits(.updatesFrequently)
                 }
             } else {
@@ -44,6 +45,6 @@ struct CaffeineTrendView: View {
             Text("Visible data from all sources. Days without visible samples have no bar.")
                 .font(.caption).foregroundStyle(.secondary)
         }
-        .padding(18).background(.background, in: RoundedRectangle(cornerRadius: 20))
+        .padding(18).background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
     }
 }

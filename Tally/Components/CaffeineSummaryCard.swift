@@ -1,6 +1,7 @@
 import SwiftUI
 
 /// This target is a personal tracking preference, never presented as a medical limit.
+/// Secondary grouped surfaces preserve rounded-card separation in dark appearance.
 struct CaffeineSummaryCard: View {
     let nutrition: NutritionValues
     let target: Double
@@ -26,7 +27,7 @@ struct CaffeineSummaryCard: View {
                 if nutrition.estimated.contains(.caffeine) { Text("~ includes estimates") }
             }.font(.caption).foregroundStyle(.secondary)
         }
-        .padding(20).background(.background, in: RoundedRectangle(cornerRadius: 24))
+        .padding(20).background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 24))
     }
 }
 
@@ -40,7 +41,7 @@ struct SecondaryNutritionCard: View {
             Text("Apple Health · all sources").font(.caption2).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading).padding(16)
-        .background(.background, in: RoundedRectangle(cornerRadius: 20))
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
         .accessibilityElement(children: .combine)
     }
 }

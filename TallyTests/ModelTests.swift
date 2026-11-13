@@ -47,6 +47,32 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(drink.caffeineMg, 110)
     }
     @MainActor
+    func testSwiftDataPersistsAcrossContainers() throws {
+        // A real temporary SQLite store verifies persistence beyond the in-memory identity-map round trip.
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("TallyPersistence-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let configuration = ModelConfiguration(url: folder.appendingPathComponent("Library.store"), cloudKitDatabase: .none)
+        let id = UUID()
+        do {
+            let writer = try ModelContainer(for: SavedDrink.self, configurations: configuration)
+            writer.mainContext.insert(SavedDrink(id: id, name: "Iced Mocha", volumeMl: 470, category: .coffee,
+                                               servingStyle: .iced, nutrition: .init(caffeine: 100, protein: 6, estimated: [.caffeine]), isFavourite: true))
+            try writer.mainContext.save()
+        }
+        let reader = try ModelContainer(for: SavedDrink.self, configurations: configuration)
+        let stored = try XCTUnwrap(reader.mainContext.fetch(FetchDescriptor<SavedDrink>()).first)
+        XCTAssertEqual(stored.id, id)
+        XCTAssertEqual(stored.caffeineMg, 100)
+        XCTAssertEqual(stored.proteinG, 6)
+        XCTAssertNil(stored.sugarG)
+        XCTAssertEqual(stored.volumeMl, 470)
+        XCTAssertTrue(stored.isFavourite)
+        XCTAssertEqual(stored.servingStyle, .iced)
+        XCTAssertEqual(stored.nutrition.estimated, [.caffeine])
+    }
+
+    @MainActor
     func testSwiftDataRoundTrip() throws {
         let container = try ModelContainer(for: SavedDrink.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
         let context = container.mainContext

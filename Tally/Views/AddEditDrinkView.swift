@@ -37,6 +37,8 @@ struct AddEditDrinkView: View {
             Section("Notes") { TextField("Anything worth remembering", text: $draft.notes, axis: .vertical).lineLimit(3...6) }
             Section { Text("This is a reusable template. Editing it won’t change anything already logged to Apple Health.").font(.footnote).foregroundStyle(.secondary) }
         }
+        // Native interactive dismissal avoids a flexible custom keyboard-accessory layout during focus changes.
+        .scrollDismissesKeyboard(.interactively)
         .navigationTitle(drink == nil ? "Add Drink" : "Edit Drink")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -47,7 +49,6 @@ struct AddEditDrinkView: View {
                     catch { self.error = error.localizedDescription }
                 }.fontWeight(.semibold).accessibilityIdentifier("saveDrink")
             }
-            ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("Done") { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) } }
         }
         .errorAlert($error, title: "Couldn’t save drink")
     }

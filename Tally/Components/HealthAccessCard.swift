@@ -1,6 +1,7 @@
 import SwiftUI
 
 /// Permission-sheet completion and readable data are intentionally different concepts in the UI.
+/// Secondary grouped surfaces preserve rounded-card separation in dark appearance.
 struct HealthAccessCard: View {
     @Environment(HealthKitManager.self) private var health
     @State private var requesting = false
@@ -24,7 +25,7 @@ struct HealthAccessCard: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading).padding(18)
-        .background(.background, in: RoundedRectangle(cornerRadius: 20))
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
         .errorAlert($error, title: "Health access needs attention")
     }
 }

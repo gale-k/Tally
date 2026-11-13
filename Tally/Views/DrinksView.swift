@@ -74,7 +74,8 @@ struct DrinksView: View {
                 }
             }
         }
-        .searchable(text: $search, prompt: "Name, brand, or size")
+        // Keep the native search field visible so finding a saved drink does not require discovering a pull gesture.
+        .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .always), prompt: "Name, brand, or size")
         .navigationTitle("Drinks")
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {

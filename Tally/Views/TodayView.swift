@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 
 /// The dashboard reads Health, while quick-log ranking uses only local template preferences and usage.
+/// Secondary grouped surfaces preserve rounded-card separation in dark appearance.
 struct TodayView: View {
     @Environment(HealthKitManager.self) private var health
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -33,7 +34,7 @@ struct TodayView: View {
                         Text(error).font(.subheadline)
                         Text("Any totals still shown are from the last successful refresh.").font(.caption)
                         Button("Try Again") { Task { await health.refresh() } }
-                    }.padding(16).background(.background, in: RoundedRectangle(cornerRadius: 18))
+                    }.padding(16).background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18))
                 }
                 HealthReadNote()
                 HStack {
@@ -47,7 +48,7 @@ struct TodayView: View {
                         Text("Save a drink once. The next one is just a couple of taps away.").font(.subheadline).foregroundStyle(.secondary)
                         Button("Add Your First Drink") { sheet = .add }.buttonStyle(.borderedProminent)
                     }.frame(maxWidth: .infinity, alignment: .leading).padding(18)
-                        .background(.background, in: RoundedRectangle(cornerRadius: 20))
+                        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
                 } else {
                     LazyVGrid(columns: columns, spacing: 12) {
                         ForEach(DrinkOrdering.quickLog(drinks)) { drink in
