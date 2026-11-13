@@ -11,6 +11,8 @@ struct SettingsView: View {
     @AppStorage("dailyCaffeineTarget") private var target = 400.0
     @AppStorage("showCalories") private var showCalories = true
     @AppStorage("showSugar") private var showSugar = true
+    @AppStorage("showProtein") private var showProtein = true
+    @AppStorage("showCaffeine") private var showCaffeine = true
     @State private var targetText = "400"
     @State private var requesting = false
     @State private var healthGuidance = false
@@ -25,6 +27,14 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            // General nutrition preferences lead; caffeine remains an optional personal tracking feature.
+            Section {
+                Toggle("Show Calories", isOn: $showCalories)
+                Toggle("Show Protein", isOn: $showProtein)
+                Toggle("Show Sugar", isOn: $showSugar)
+                Toggle("Show Caffeine & Trend", isOn: $showCaffeine)
+            } header: { Text("Nutrition on Today") }
+            footer: { Text("Choose the summaries you want to see. All nutrition remains available in templates, Quick Add, and history details.") }
             Section {
                 HStack {
                     Text("Daily target")
@@ -52,33 +62,29 @@ struct SettingsView: View {
                 }
                 if let queryError = health.queryError { Text(queryError).font(.footnote).foregroundStyle(.secondary) }
             } header: { Text("Apple Health") }
-            footer: { Text("Health keeps read permissions private. No visible samples can mean no data or restricted access. Allow every known nutrient when logging a drink; otherwise nothing in that event is saved.") }
+            footer: { Text("Health keeps read permissions private. No visible samples can mean no data or restricted access. Allow every known nutrient when logging an item; otherwise nothing in that event is saved.") }
+
             Section {
-                Toggle("Show Calories", isOn: $showCalories)
-                Toggle("Show Sugar", isOn: $showSugar)
-            } header: { Text("Nutrition on Today") }
-            footer: { Text("Advanced nutrition remains available in templates, Quick Add, and history details.") }
-            Section {
-                Button("Export Saved Drinks", systemImage: "square.and.arrow.up") {
+                Button("Export Library", systemImage: "square.and.arrow.up") {
                     do { document = DrinkLibraryDocument(data: try DrinkExportService.export(drinks)); exporting = true }
                     catch { self.error = error.localizedDescription }
                 }
-                Button("Import Saved Drinks", systemImage: "square.and.arrow.down") { importing = true }
+                Button("Import Library", systemImage: "square.and.arrow.down") { importing = true }
             } header: { Text("Data") }
-            footer: { Text("JSON contains saved templates and favourites only, never Apple Health history. Import adds missing drinks and leaves existing drinks unchanged.") }
+            footer: { Text("JSON contains saved templates and favourites only, never Apple Health history. Import adds missing items and leaves existing items unchanged.") }
             Section("About") {
-                Label("Tally", systemImage: "cup.and.saucer.fill").font(.headline)
-                Text("Saved drinks are stored locally on this device. Logged nutrition is saved to Apple Health.")
+                Label("Tally", systemImage: "list.bullet.clipboard.fill").font(.headline)
+                Text("Saved foods and drinks are stored locally on this device. Logged nutrition is saved to Apple Health.")
                 Text("No accounts, advertising, analytics, or Tally cloud syncing.").font(.footnote).foregroundStyle(.secondary)
                 LabeledContent("Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")
             }
             #if DEBUG
             Section {
-                Button(developmentSeeded ? "Example drinks already added" : "Add Development Example Drinks") {
+                Button(developmentSeeded ? "Examples already added" : "Add Development Examples") {
                     do { try DevelopmentData.seed(in: context) } catch { self.error = error.localizedDescription }
                 }.disabled(developmentSeeded)
             } header: { Text("Development") }
-            footer: { Text("Debug builds only. Adds the seven provided examples once, with all unknown nutrition blank. Never writes to Apple Health.") }
+            footer: { Text("Debug builds only. Adds synthetic food and drink examples once, with all unknown nutrition blank. Never writes to Apple Health.") }
             #endif
         }
         .navigationTitle("Settings")
@@ -87,7 +93,7 @@ struct SettingsView: View {
             Button("Review Permission Request") { Task { await requestAccess() } }
             Button("Open App Settings") { openURL(URL(string: UIApplication.openSettingsURLString)!) }
         } message: { Text("To change existing Health choices, open Health → your profile → Apps → Tally. Reviewing the request only shows a permission sheet if Health needs a new decision. App Settings opens the supported system settings page; Tally cannot toggle Health permissions for you.") }
-        .fileExporter(isPresented: $exporting, document: document, contentType: .json, defaultFilename: "Tally Drinks") { result in
+        .fileExporter(isPresented: $exporting, document: document, contentType: .json, defaultFilename: "Tally Library") { result in
             if case let .failure(error) = result, (error as NSError).code != NSUserCancelledError { self.error = error.localizedDescription }
         }
         .fileImporter(isPresented: $importing, allowedContentTypes: [.json]) { result in

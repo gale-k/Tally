@@ -11,6 +11,10 @@ struct TallyApp: App {
     init() {
         #if DEBUG
         let uiTesting = ProcessInfo.processInfo.arguments.contains("--ui-testing")
+        if uiTesting {
+            // UI-test presentation choices must not leak into the next test; normal device preferences are untouched.
+            for key in ["showCalories", "showProtein", "showSugar", "showCaffeine"] { UserDefaults.standard.removeObject(forKey: key) }
+        }
         _health = State(initialValue: uiTesting
                         ? HealthKitManager(client: FixtureNutritionStore(populated: ProcessInfo.processInfo.arguments.contains("--populated-health")), defaults: nil)
                         : HealthKitManager())

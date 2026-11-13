@@ -8,7 +8,7 @@ struct RootView: View {
     var body: some View {
         TabView(selection: $selected) {
             Tab("Today", systemImage: "sun.max", value: 0) { NavigationStack { TodayView { selected = 1 } } }
-            Tab("Drinks", systemImage: "cup.and.saucer", value: 1) { NavigationStack { DrinksView() } }
+            Tab("Library", systemImage: "list.bullet.clipboard", value: 1) { NavigationStack { DrinksView() } }
             Tab("History", systemImage: "clock", value: 2) { NavigationStack { HistoryView() } }
             Tab("Settings", systemImage: "gearshape", value: 3) { NavigationStack { SettingsView() } }
         }

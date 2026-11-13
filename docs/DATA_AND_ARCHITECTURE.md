@@ -2,17 +2,25 @@
 
 ## Ownership
 
-`SavedDrink` is the only SwiftData model. It stores template details, optional nutrient amounts, per-nutrient estimate markers, favourites, and convenience usage statistics. The single local `ModelContainer` explicitly disables CloudKit. Editors use a `DrinkDraft` snapshot and commit through `DrinkLibrary`; saves surface errors and roll back failed local changes.
+`SavedDrink` is the only SwiftData model; its legacy name and persisted properties are retained for compatibility, and it now represents both foods and drinks. It stores template details, optional nutrient amounts, per-nutrient estimate markers, favourites, and convenience usage statistics. The single local `ModelContainer` explicitly disables CloudKit. Editors use a `DrinkDraft` snapshot and commit through `DrinkLibrary`; saves surface errors and roll back failed local changes.
 
 `NutritionValues` and `Nutrient` centralise optional semantics, display, units, and input validation. User-entered nutrition must be finite and nonnegative. Typing-error bounds are 10,000 mg caffeine, 50,000 kcal, and 10,000 g for each other nutrient; these are input constraints, not health guidance. The optional volume must be greater than zero and at most 100,000 ml.
 
 `NutritionStore` abstracts Health operations. `HealthKitStore` is the system adapter, while `HealthKitManager` coordinates transient query results and saving state. The views receive that manager through the SwiftUI environment. Health history is never persisted as a second database.
 
+## General nutrition presentation
+
+Category raw values are additive: meal, snack, fruit/vegetables, and dairy/alternatives join the existing beverage values. No stored field or JSON key is renamed. New templates default to category `other` and serving style `other`; the latter displays as “Not specified”, so food never requires a hot/iced style or liquid volume. Existing coffee/hot and other selections are retained when editing.
+
+`Nutrient.formOrder` defines the balanced editor order. `NutritionValues.displayNutrients`, `summaryNutrients`, and `summaryText` select only known amounts for cards and history, retaining zeroes and estimate markers. Caffeine-only drinks still display their caffeine; protein-only and other food entries receive meaningful summaries without a made-up caffeine value.
+
+Today uses equal-weight calorie/protein/sugar/caffeine cards. The original `showCalories`, `showSugar`, and personal-target preference keys remain; independent `showProtein` and `showCaffeine` settings control the new presentation. The caffeine chart follows its visibility setting. These are presentation preferences only and do not alter Health permissions or supported nutrients.
+
 ## Saving a consumption event
 
 Confirmation creates an independent `ConsumptionDraft`, with one UUID and one timestamp. Only present values become `HKQuantitySample`s. Caffeine uses `gramUnit(with: .milli)`, energy uses `kilocalorie()`, and other supported nutrients use `gram()`.
 
-The adapter checks Health availability and exposed write authorization for every present nutrient. It saves the complete sample array in one call. The installed SDK documents that if any object cannot be saved, none of that array is saved. This avoids silently logging only part of a drink when permissions are incomplete.
+The adapter checks Health availability and exposed write authorization for every present nutrient. It saves the complete sample array in one call. The installed SDK documents that if any object cannot be saved, none of that array is saved. This avoids silently logging only part of an entry when permissions are incomplete.
 
 Samples use `HKMetadataKeyFoodType` and `HKMetadataKeyWasUserEntered`, plus reverse-DNS custom keys for event ID, brand, size, and that sample’s estimate flag. No local template relationship is required to read the historical event later.
 
@@ -30,6 +38,8 @@ Only samples whose source bundle matches Tally may be grouped by Tally event met
 
 The dashboard refreshes after logging, when returning to the foreground, and on pull-to-refresh. Refresh generations prevent a stale overlapping response from replacing a newer response. Query failures remain visible alongside any previously refreshed data and its timestamp.
 
+The event-name fallback is now “Nutrition entry” when no food-type metadata is present. Existing names from Health are used verbatim, including historical drinks. Metadata keys, bundle identity, and grouping rules are unchanged.
+
 ## Library JSON, version 1
 
 The root object has `version: 1` and `drinks: [SavedDrinkRecord]`. Records include identity, template details, nutrition and estimate flags, favourites, and creation/update timestamps. Dates use ISO 8601. There are no Health samples, consumption timestamps, or usage counts in the export. Imported templates start with a zero usage count and no last-logged date.
@@ -38,7 +48,7 @@ Import validates the complete document before insertion. Duplicate IDs within a 
 
 ## Development fixtures
 
-`DevelopmentData.swift` contains only the seven requested Debug presets. The persistent once-only marker is set after a successful batch save. Normal app launches do not auto-seed.
+`DevelopmentData.swift` contains only six synthetic food and drink Debug presets; demonstration amounts are not a nutrition reference. The original `developmentPresetsSeeded.v1` marker is retained, so upgrades never insert a second batch. The persistent once-only marker is set after a successful batch save. Normal app launches do not auto-seed.
 
 `UITestFixtures.swift` is Debug-only. `--ui-testing` selects an in-memory SwiftData store and `FixtureNutritionStore`. Additional arguments select seeded templates, synthetic history, dark appearance, accessibility text sizes, and permission/query failure states. These test arguments and synthetic health samples do not exist in Release behavior.
 

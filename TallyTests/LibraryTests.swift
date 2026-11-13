@@ -39,10 +39,30 @@ final class LibraryTests: XCTestCase {
         let container = try ModelContainer(for: SavedDrink.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
         try DevelopmentData.seed(in: container.mainContext, defaults: nil)
         let drinks = try container.mainContext.fetch(FetchDescriptor<SavedDrink>())
-        XCTAssertEqual(drinks.count, 7)
-        XCTAssertTrue(drinks.allSatisfy { $0.caloriesKcal == nil && $0.sugarG == nil })
+        XCTAssertEqual(drinks.count, 6)
+        XCTAssertTrue(drinks.filter { $0.category == .coffee }.allSatisfy { $0.caloriesKcal == nil && $0.sugarG == nil })
+        let food = try XCTUnwrap(drinks.first { $0.name == "Lunch Bowl" })
+        XCTAssertNil(food.caffeineMg)
+        XCTAssertNil(food.volumeMl)
+        XCTAssertEqual(food.servingStyle, .other)
+        XCTAssertEqual(food.proteinG, 24)
+        XCTAssertTrue(food.nutrition.estimated.contains(.protein))
         XCTAssertEqual(drinks.first { $0.name == "Iced Mocha" }?.volumeMl, 470)
         XCTAssertEqual(drinks.first { $0.brandOrLocation == "Starbucks" }?.caffeineMg, 125)
+    }
+    func testDevelopmentSeedKeepsExistingOnceOnlyMarker() throws {
+        // Reusing the old marker prevents an app update from inserting a fresh batch into an existing library.
+        let suite = "TallySeed-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let container = try ModelContainer(for: SavedDrink.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        defaults.set(true, forKey: "developmentPresetsSeeded.v1")
+        try DevelopmentData.seed(in: container.mainContext, defaults: defaults)
+        XCTAssertEqual(try container.mainContext.fetchCount(FetchDescriptor<SavedDrink>()), 0)
+        defaults.removeObject(forKey: DevelopmentData.marker)
+        try DevelopmentData.seed(in: container.mainContext, defaults: defaults)
+        try DevelopmentData.seed(in: container.mainContext, defaults: defaults)
+        XCTAssertEqual(try container.mainContext.fetchCount(FetchDescriptor<SavedDrink>()), 6)
     }
     #endif
 }

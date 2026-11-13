@@ -7,20 +7,21 @@ final class TallyUITests: XCTestCase {
 
     func testAppLaunchesWithFourTabs() {
         let app = launch()
-        for title in ["Today", "Drinks", "History", "Settings"] { XCTAssertTrue(app.tabBars.buttons[title].exists) }
+        for title in ["Today", "Library", "History", "Settings"] { XCTAssertTrue(app.tabBars.buttons[title].exists) }
         XCTAssertTrue(app.buttons["chooseHealthAccess"].exists)
+        capture("Empty-Today", app)
     }
 
     func testCreateTemplateWithUnknownNutritionAndSearch() {
         let app = launch()
-        app.tabBars.buttons["Drinks"].tap()
+        app.tabBars.buttons["Library"].tap()
         app.buttons["addDrink"].tap()
         let name = app.textFields["drinkName"]
         XCTAssertTrue(name.waitForExistence(timeout: 5))
-        name.tap(); name.typeText("Mystery Coffee")
+        name.tap(); name.typeText("Mystery Snack")
         capture("Editor-Name-Keyboard", app)
         app.buttons["saveDrink"].tap()
-        let drink = app.buttons["drink.Mystery Coffee"]
+        let drink = app.buttons["drink.Mystery Snack"]
         XCTAssertTrue(drink.waitForExistence(timeout: 5))
         let search = app.searchFields.firstMatch
         search.tap(); search.typeText("Mystery")
@@ -31,57 +32,58 @@ final class TallyUITests: XCTestCase {
 
     func testConfirmedLogSurvivesTemplateEditAndDeletion() {
         let app = launch(["--seed-library"])
-        app.tabBars.buttons["Drinks"].tap()
+        app.tabBars.buttons["Library"].tap()
         app.buttons["drink.Iced Mocha"].tap()
         XCTAssertTrue(app.buttons["confirmLogDrink"].waitForExistence(timeout: 5))
         app.buttons["confirmLogDrink"].tap()
-        XCTAssertTrue(app.tabBars.buttons["Drinks"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.tabBars.buttons["Library"].waitForExistence(timeout: 5))
         app.buttons["More actions for Iced Mocha"].tap()
-        app.buttons["Edit Drink"].tap()
+        app.buttons["Edit Item"].tap()
         replace(app.textFields["nutrition.caffeine"], with: "110")
         capture("Editor-Caffeine-Keyboard", app)
         app.buttons["saveDrink"].tap()
         app.tabBars.buttons["History"].tap()
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "~100 mg caffeine")).firstMatch.waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "~110 mg caffeine")).firstMatch.exists)
-        app.tabBars.buttons["Drinks"].tap()
+        app.tabBars.buttons["Library"].tap()
         app.buttons["More actions for Iced Mocha"].tap()
-        app.buttons["Delete Drink"].tap()
-        app.buttons["Delete Drink"].tap()
-        XCTAssertFalse(app.buttons["drink.Iced Mocha"].exists)
+        app.buttons["Delete Item"].tap()
+        app.buttons["Delete Item"].tap()
+        XCTAssertTrue(app.buttons["drink.Iced Mocha"].waitForNonExistence(timeout: 5))
         app.tabBars.buttons["History"].tap()
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "~100 mg caffeine")).firstMatch.exists)
     }
 
     func testQuickAddCanLogCaffeineOnlyAndSaveReusableDrink() {
         let app = launch()
-        app.tabBars.buttons["Drinks"].tap()
+        app.tabBars.buttons["Library"].tap()
         app.buttons["Quick Add"].tap()
         let caffeine = app.textFields["nutrition.caffeine"]
         XCTAssertTrue(caffeine.waitForExistence(timeout: 5))
         caffeine.tap(); caffeine.typeText("80")
         XCTAssertEqual(caffeine.value as? String, "80")
         app.swipeUp()
-        let reusable = app.switches["Save as reusable drink"]
+        let reusable = app.switches["Save as reusable item"]
         // SwiftUI exposes the label and switch as one accessibility row; tap the actual trailing switch.
         reusable.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
         XCTAssertEqual(reusable.value as? String, "1")
         app.buttons["quickLogToHealth"].tap()
         XCTAssertTrue(app.buttons["quickLogToHealth"].waitForNonExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["drink.Quick drink"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["drink.Quick entry"].waitForExistence(timeout: 5))
         app.tabBars.buttons["History"].tap()
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "80 mg caffeine")).firstMatch.waitForExistence(timeout: 5))
     }
 
     func testWritePermissionFailureDoesNotDismissOrCreateHistory() {
         let app = launch(["--seed-library", "--write-denied"])
-        app.tabBars.buttons["Drinks"].tap()
+        app.tabBars.buttons["Library"].tap()
         app.buttons["drink.Iced Mocha"].tap()
         app.buttons["confirmLogDrink"].tap()
-        XCTAssertTrue(app.alerts["Couldn’t log drink"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.alerts["Couldn’t log item"].waitForExistence(timeout: 5))
+        capture("Write-Permission-Error", app)
         app.alerts.buttons["OK"].tap()
         XCTAssertTrue(app.buttons["confirmLogDrink"].exists)
-        app.navigationBars["Log Drink"].buttons["Cancel"].tap()
+        app.navigationBars["Log Item"].buttons["Cancel"].tap()
         app.tabBars.buttons["History"].tap()
         XCTAssertTrue(app.staticTexts["No visible nutrition yet"].exists)
     }
@@ -90,10 +92,12 @@ final class TallyUITests: XCTestCase {
         var app = launch(["--query-failure"])
         app.buttons["chooseHealthAccess"].tap()
         XCTAssertTrue(app.staticTexts["Health refresh needs attention"].waitForExistence(timeout: 5))
+        capture("Query-Error", app)
         app.terminate()
         app = launch(["--health-unavailable", "--seed-library"])
         XCTAssertTrue(app.staticTexts["Apple Health unavailable"].exists)
-        app.tabBars.buttons["Drinks"].tap()
+        capture("Health-Unavailable", app)
+        app.tabBars.buttons["Library"].tap()
         XCTAssertTrue(app.buttons["drink.Iced Mocha"].exists)
     }
 
@@ -103,14 +107,17 @@ final class TallyUITests: XCTestCase {
         capture("Today-Light", app)
         app.swipeUp()
         capture("QuickLog-And-Trend-Light", app)
-        app.tabBars.buttons["Drinks"].tap()
-        capture("Drinks-Light", app)
+        app.tabBars.buttons["Library"].tap()
+        capture("Library-Light", app)
         app.buttons["drink.Iced Mocha"].tap()
         capture("Confirmation-Light", app)
-        app.navigationBars["Log Drink"].buttons["Cancel"].tap()
+        app.navigationBars["Log Item"].buttons["Cancel"].tap()
         app.buttons["addDrink"].tap()
         capture("Editor-Light", app)
-        app.navigationBars["Add Drink"].buttons["Cancel"].tap()
+        app.navigationBars["Add Item"].buttons["Cancel"].tap()
+        app.buttons["Quick Add"].tap()
+        capture("QuickAdd-Light", app)
+        app.navigationBars["Quick Add"].buttons["Cancel"].tap()
         app.tabBars.buttons["History"].tap()
         capture("History-Light", app)
         app.tabBars.buttons["Settings"].tap()
@@ -121,16 +128,138 @@ final class TallyUITests: XCTestCase {
         let app = launch(["--seed-library", "--populated-health", "--dark-mode"])
         connectFixture(app)
         capture("Today-Dark", app)
-        app.tabBars.buttons["Drinks"].tap()
-        capture("Drinks-Dark", app)
+        app.tabBars.buttons["Library"].tap()
+        capture("Library-Dark", app)
+        let lunch = app.buttons["drink.Lunch Bowl"]
+        reveal(lunch, in: app)
+        lunch.tap()
+        capture("Confirmation-Dark", app)
+        app.navigationBars["Log Item"].buttons["Cancel"].tap()
+        app.buttons["addDrink"].tap()
+        capture("Editor-Dark", app)
+        app.navigationBars["Add Item"].buttons["Cancel"].tap()
+        app.buttons["Quick Add"].tap()
+        capture("QuickAdd-Dark", app)
+        app.navigationBars["Quick Add"].buttons["Cancel"].tap()
+        app.tabBars.buttons["History"].tap()
+        capture("History-Dark", app)
+        app.tabBars.buttons["Settings"].tap()
+        capture("Settings-Dark", app)
     }
 
     func testScreenshotsAccessibilityText() {
         let app = launch(["--seed-library", "--populated-health", "--large-text"])
         connectFixture(app)
         capture("Today-Accessibility3", app)
-        app.tabBars.buttons["Drinks"].tap()
-        capture("Drinks-Accessibility3", app)
+        app.tabBars.buttons["Library"].tap()
+        capture("Library-Accessibility3", app)
+        let lunch = app.buttons["drink.Lunch Bowl"]
+        reveal(lunch, in: app)
+        lunch.tap()
+        capture("Confirmation-Accessibility3", app)
+        app.navigationBars["Log Item"].buttons["Cancel"].tap()
+        app.buttons["addDrink"].tap()
+        capture("Editor-Accessibility3", app)
+        reveal(app.textFields["nutrition.calories"], in: app)
+        capture("Editor-Nutrition-Accessibility3", app)
+        app.navigationBars["Add Item"].buttons["Cancel"].tap()
+        app.buttons["Quick Add"].tap()
+        capture("QuickAdd-Accessibility3", app)
+        reveal(app.buttons["quickLogToHealth"], in: app)
+        capture("QuickAdd-Action-Accessibility3", app)
+        app.navigationBars["Quick Add"].buttons["Cancel"].tap()
+        app.tabBars.buttons["History"].tap()
+        capture("History-Accessibility3", app)
+        app.tabBars.buttons["Settings"].tap()
+        capture("Settings-Accessibility3", app)
+    }
+
+    /// Food-only nutrition must use the same confirmation and Health flow without manufacturing caffeine.
+    func testFoodWithCaloriesAndProteinCanBeSavedAndLogged() {
+        let app = launch()
+        app.tabBars.buttons["Library"].tap()
+        app.buttons["addDrink"].tap()
+        let name = app.textFields["drinkName"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        name.tap(); name.typeText("My Lunch")
+        let calories = app.textFields["nutrition.calories"]
+        reveal(calories, in: app)
+        calories.tap(); calories.typeText("380")
+        let protein = app.textFields["nutrition.protein"]
+        protein.tap(); protein.typeText("24")
+        app.buttons["saveDrink"].tap()
+        let item = app.buttons["drink.My Lunch"]
+        XCTAssertTrue(item.waitForExistence(timeout: 5))
+        XCTAssertTrue(item.label.contains("24 g protein"))
+        XCTAssertFalse(item.label.contains("Caffeine unknown"))
+        item.tap()
+        XCTAssertTrue(app.buttons["confirmLogDrink"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["Caffeine"].exists)
+        capture("Food-Confirmation", app)
+        app.buttons["confirmLogDrink"].tap()
+        XCTAssertTrue(app.buttons["confirmLogDrink"].waitForNonExistence(timeout: 10))
+        app.tabBars.buttons["History"].tap()
+        let event = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "24 g protein")).firstMatch
+        XCTAssertTrue(event.waitForExistence(timeout: 5))
+        event.tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "380 kcal")).firstMatch.exists)
+        XCTAssertFalse(app.staticTexts["Caffeine"].exists)
+        capture("Food-History-Detail", app)
+    }
+
+    /// Hiding caffeine is a presentation choice; caffeine-only templates remain usable in the same library.
+    func testTodayNutrientsCanBeConfiguredWithoutChangingTemplates() {
+        let app = launch(["--seed-library", "--populated-health"])
+        connectFixture(app)
+        app.tabBars.buttons["Settings"].tap()
+        let caffeine = app.switches["Show Caffeine & Trend"]
+        caffeine.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+        XCTAssertEqual(caffeine.value as? String, "0")
+        app.tabBars.buttons["Today"].tap()
+        XCTAssertFalse(app.staticTexts["todayCaffeine"].exists)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "600 kcal")).firstMatch.exists)
+        app.tabBars.buttons["Library"].tap()
+        XCTAssertTrue(app.buttons["drink.Iced Mocha"].label.contains("~100 mg caffeine"))
+    }
+
+    /// Audit actionable descriptions; native SwiftUI scaling and contrast are separately checked in runtime captures.
+    func testAccessibilityDescriptions() throws {
+        let app = launch(["--seed-library", "--populated-health"])
+        connectFixture(app)
+        // Broad scaling/contrast audits misidentify native controls and off-screen content on this runtime.
+        // Keep deterministic description checks here; the explicit appearance tests capture the actual large-text layouts.
+        let checks: XCUIAccessibilityAuditType = [.sufficientElementDescription]
+        var findings: [String] = []
+        func audit(_ screen: String) throws {
+            // Collect every issue across screens, then fail once; no finding is silently ignored.
+            try app.performAccessibilityAudit(for: checks) { issue in
+                findings.append("\(screen): \(issue.element?.label ?? "Unknown element") — \(issue.detailedDescription)")
+                return true
+            }
+        }
+        try audit("Today")
+        for title in ["Library", "History", "Settings"] {
+            app.tabBars.buttons[title].tap()
+            try audit(title)
+        }
+        app.tabBars.buttons["Library"].tap()
+        app.buttons["drink.Iced Mocha"].tap()
+        try audit("Confirmation")
+        app.navigationBars["Log Item"].buttons["Cancel"].tap()
+        app.buttons["addDrink"].tap()
+        try audit("Editor")
+        XCTAssertTrue(findings.isEmpty, findings.joined(separator: "\n"))
+    }
+
+    // SwiftUI Forms lazily expose off-screen fields. Scroll until the actual target is visible, including after keyboard dismissal.
+    private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
+        for _ in 0..<10 {
+            if element.exists && element.isHittable { return }
+            // A short drag avoids jumping past a field when the keyboard reduces the visible Form height.
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.05,
+                thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)))
+        }
+        XCTAssertTrue(element.exists && element.isHittable, "Could not reveal \(element)")
     }
 
     private func launch(_ arguments: [String] = []) -> XCUIApplication {
@@ -153,11 +282,13 @@ final class TallyUITests: XCTestCase {
         XCTAssertTrue(total.label.contains("225"))
     }
     private func replace(_ field: XCUIElement, with value: String) {
-        XCTAssertTrue(field.waitForExistence(timeout: 5))
-        if !field.isHittable { XCUIApplication().swipeUp() }
-        field.tap()
-        // Use the SDK's native hardware-key API rather than sending control-key strings as text.
-        field.typeKey("a", modifierFlags: .command)
+        let app = XCUIApplication()
+        reveal(field, in: app)
+        let current = field.value as? String ?? ""
+        // Decimal-pad Command-A is unreliable in this Simulator. Tap at the trailing edge to place the caret after the value.
+        field.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.5)).tap()
+        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count))
+        XCTAssertTrue(["", "Optional"].contains(field.value as? String ?? ""))
         field.typeText(value)
         XCTAssertEqual(field.value as? String, value)
     }

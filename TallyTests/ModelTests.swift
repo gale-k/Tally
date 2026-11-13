@@ -29,6 +29,25 @@ final class ModelTests: XCTestCase {
         XCTAssertTrue(drink.nutrition.isEmpty)
         XCTAssertNil(drink.volumeMl)
     }
+    func testFoodDraftNeedsNoCaffeineVolumeOrServingStyle() throws {
+        var draft = DrinkDraft()
+        draft.name = "Lunch"; draft.category = .meal
+        draft.values = [.calories: "380", .protein: "24", .sugar: "0"]
+        draft.estimated = [.protein]
+        let item = try draft.makeDrink()
+        XCTAssertEqual(item.category, .meal)
+        XCTAssertEqual(item.servingStyle, .other)
+        XCTAssertNil(item.volumeMl)
+        XCTAssertNil(item.caffeineMg)
+        XCTAssertEqual(item.sugarG, 0)
+        XCTAssertEqual(item.nutrition.summaryText, "380 kcal · ~24 g protein · 0 g sugar")
+    }
+    func testSummariesHandleProteinOnlyFatOnlyAndUnknownNutrition() {
+        XCTAssertEqual(NutritionValues(protein: 18).summaryText, "18 g protein")
+        XCTAssertEqual(NutritionValues(totalFat: 2).summaryText, "2 g total fat")
+        XCTAssertTrue(NutritionValues().summaryNutrients.isEmpty)
+        XCTAssertEqual(NutritionValues(caffeine: 0).summaryText, "0 mg caffeine")
+    }
     func testDecimalParsingAndInvalidInput() throws {
         XCTAssertNil(try DrinkDraft.parse(" ", nutrient: .sugar))
         XCTAssertEqual(try DrinkDraft.parse("1,25", nutrient: .sugar, locale: Locale(identifier: "fr_FR")), 1.25)

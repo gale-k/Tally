@@ -6,8 +6,8 @@ struct DrinkDraft {
     var brand = ""
     var size = ""
     var volume = ""
-    var category: DrinkCategory = .coffee
-    var servingStyle: ServingStyle = .hot
+    var category: DrinkCategory = .other
+    var servingStyle: ServingStyle = .other
     var isFavourite = false
     var notes = ""
     var values: [Nutrient: String] = [:]

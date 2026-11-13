@@ -17,7 +17,10 @@ enum Nutrient: String, CaseIterable, Codable, Identifiable, Sendable {
         }
     }
     var unit: String { self == .caffeine ? "mg" : self == .calories ? "kcal" : "g" }
-    var isCore: Bool { [.caffeine, .calories, .sugar].contains(self) }
+    // Balanced food-and-drink forms keep protein accessible without removing caffeine.
+    static let formOrder: [Nutrient] = [.calories, .protein, .sugar, .caffeine, .carbohydrates, .totalFat, .saturatedFat, .fibre]
+    static let displayOrder: [Nutrient] = [.calories, .protein, .caffeine, .sugar, .carbohydrates, .fibre, .totalFat, .saturatedFat]
+    var isCore: Bool { [.calories, .protein, .sugar, .caffeine].contains(self) }
     // These generous input limits catch typing mistakes and keep aggregation finite; they are not health advice.
     var inputLimit: Double { self == .caffeine ? 10_000 : self == .calories ? 50_000 : 10_000 }
 }
@@ -63,6 +66,15 @@ struct NutritionValues: Codable, Equatable, Sendable {
     var knownNutrients: [Nutrient] { Nutrient.allCases.filter { self[$0] != nil } }
     var isEmpty: Bool { knownNutrients.isEmpty }
 
+    // Summaries show only known values. Foods without caffeine never get a misleading caffeine placeholder.
+    var displayNutrients: [Nutrient] { Nutrient.displayOrder.filter { self[$0] != nil } }
+    var summaryNutrients: [Nutrient] { Array(displayNutrients.prefix(2)) }
+    func summaryLabel(_ nutrient: Nutrient) -> String {
+        guard let amount = formatted(nutrient) else { return "" }
+        return nutrient == .calories ? amount : "\(amount) \(nutrient.title.lowercased())"
+    }
+    var summaryText: String { displayNutrients.prefix(3).map { summaryLabel($0) }.joined(separator: " · ") }
+
     func validate() throws {
         for nutrient in knownNutrients {
             guard let value = self[nutrient], value.isFinite, value >= 0, value <= nutrient.inputLimit else {
@@ -81,7 +93,7 @@ enum DrinkValidationError: LocalizedError {
     case nameRequired, noNutrition, invalidNumber(String, Double, String), invalidVolume, invalidDate
     var errorDescription: String? {
         switch self {
-        case .nameRequired: "Give your drink a name."
+        case .nameRequired: "Give your item a name."
         case .noNutrition: "Add at least one nutrition value before logging. Unknown values can stay blank."
         case let .invalidNumber(name, limit, unit): "Enter a number from 0 to \(limit.formatted()) \(unit) for \(name.lowercased())."
         case .invalidVolume: "Enter a volume greater than 0 and no more than 100,000 ml, or leave it blank."

@@ -3,10 +3,14 @@ import SwiftData
 
 /// Raw values keep the persistent schema stable when display names change.
 enum DrinkCategory: String, Codable, CaseIterable, Identifiable, Sendable {
-    case coffee, energyDrink, teaChai, pod, softDrink, other
+    case meal, snack, fruitVegetables, dairyAlternatives, coffee, energyDrink, teaChai, pod, softDrink, other
     var id: String { rawValue }
     var title: String {
         switch self {
+        case .meal: "Meal"
+        case .snack: "Snack"
+        case .fruitVegetables: "Fruit & Vegetables"
+        case .dairyAlternatives: "Dairy & Alternatives"
         case .coffee: "Coffee"
         case .energyDrink: "Energy Drink"
         case .teaChai: "Tea / Chai"
@@ -17,12 +21,16 @@ enum DrinkCategory: String, Codable, CaseIterable, Identifiable, Sendable {
     }
     var symbol: String {
         switch self {
+        case .meal: "fork.knife"
+        case .snack: "carrot.fill"
+        case .fruitVegetables: "leaf.fill"
+        case .dairyAlternatives: "refrigerator.fill"
         case .coffee: "cup.and.saucer.fill"
         case .energyDrink: "bolt.fill"
         case .teaChai: "mug.fill"
         case .pod: "circle.hexagongrid.fill"
         case .softDrink: "waterbottle.fill"
-        case .other: "takeoutbag.and.cup.and.straw.fill"
+        case .other: "list.bullet.clipboard.fill"
         }
     }
 }
@@ -30,10 +38,12 @@ enum DrinkCategory: String, Codable, CaseIterable, Identifiable, Sendable {
 enum ServingStyle: String, Codable, CaseIterable, Identifiable, Sendable {
     case hot, iced, can, bottle, pod, other
     var id: String { rawValue }
-    var title: String { rawValue.capitalized }
+    // The existing raw value represents an unspecified style without changing the stored schema.
+    var title: String { self == .other ? "Not specified" : rawValue.capitalized }
 }
 
-/// This is a reusable template only. Actual consumption is never stored in SwiftData.
+/// The legacy model name preserves existing stores and JSON. Templates now cover foods and drinks.
+/// Actual consumption is never stored in SwiftData.
 @Model
 final class SavedDrink {
     @Attribute(.unique) var id: UUID
@@ -60,7 +70,7 @@ final class SavedDrink {
     var timesLogged: Int
 
     init(id: UUID = UUID(), name: String, brandOrLocation: String? = nil, size: String? = nil,
-         volumeMl: Double? = nil, category: DrinkCategory = .coffee, servingStyle: ServingStyle = .hot,
+         volumeMl: Double? = nil, category: DrinkCategory = .other, servingStyle: ServingStyle = .other,
          nutrition: NutritionValues = .init(), notes: String? = nil, isFavourite: Bool = false,
          createdAt: Date = .now, updatedAt: Date = .now, lastLoggedAt: Date? = nil, timesLogged: Int = 0) {
         self.id = id

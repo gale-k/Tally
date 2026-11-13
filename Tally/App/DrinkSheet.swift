@@ -24,6 +24,10 @@ extension View {
                 case .quickAdd: QuickAddView()
                 }
             }
+            #if DEBUG
+            // Modal roots also need the screenshot fixture's environment override; normal launches keep system settings.
+            .modifier(DevelopmentAppearance())
+            #endif
         }
     }
 }

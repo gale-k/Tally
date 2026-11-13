@@ -7,12 +7,18 @@ struct NutritionSummaryView: View {
     var body: some View {
         if compact {
             VStack(alignment: .trailing, spacing: 4) {
-                Text(nutrition.formatted(.caffeine) ?? "Caffeine unknown")
-                    .font(nutrition.caffeine == nil ? .subheadline : .headline).foregroundStyle(nutrition.caffeine == nil ? .secondary : .primary)
-                if let calories = nutrition.formatted(.calories) { Text(calories).font(.caption).foregroundStyle(.secondary) }
+                if nutrition.isEmpty {
+                    Text("Nutrition not added").font(.subheadline).foregroundStyle(.secondary)
+                } else {
+                    ForEach(nutrition.summaryNutrients) { nutrient in
+                        Text(nutrition.summaryLabel(nutrient))
+                            .font(nutrient == nutrition.summaryNutrients.first ? .subheadline.weight(.semibold) : .caption)
+                            .foregroundStyle(nutrient == nutrition.summaryNutrients.first ? .primary : .secondary)
+                    }
+                }
             }.monospacedDigit()
         } else {
-            ForEach(nutrition.knownNutrients) { nutrient in
+            ForEach(nutrition.displayNutrients) { nutrient in
                 LabeledContent(nutrient.title, value: nutrition.formatted(nutrient) ?? "")
                     .accessibilityLabel("\(nutrient.title), \(nutrition.formatted(nutrient) ?? "")\(nutrition.estimated.contains(nutrient) ? ", estimated" : "")")
             }

@@ -32,9 +32,9 @@ struct LogDrinkSheet: View {
                 Button {
                     if savedToHealth { dismiss() } else { Task { await log() } }
                 } label: {
-                    HStack { Spacer(); if saving { ProgressView() }; Text(savedToHealth ? "Done" : "Log Drink"); Spacer() }
+                    HStack { Spacer(); if saving { ProgressView() }; Text(savedToHealth ? "Done" : "Log Item"); Spacer() }
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.borderedProminent).foregroundStyle(Color(.systemBackground))
                 .listRowBackground(Color.clear)
                 .disabled(saving || (!savedToHealth && drink.nutrition.isEmpty))
                 .accessibilityIdentifier("confirmLogDrink")
@@ -42,10 +42,10 @@ struct LogDrinkSheet: View {
             if savedToHealth { Section { Label("Saved to Apple Health", systemImage: "checkmark.circle.fill").foregroundStyle(.green) } }
             if !health.isAvailable { Section { Text(HealthAccessError.unavailable.localizedDescription).foregroundStyle(.secondary) } }
         }
-        .navigationTitle("Log Drink").navigationBarTitleDisplayMode(.inline)
+        .navigationTitle("Log Item").navigationBarTitleDisplayMode(.inline)
         .toolbar { ToolbarItem(placement: .cancellationAction) { Button(savedToHealth ? "Done" : "Cancel") { dismiss() }.disabled(saving) } }
         .interactiveDismissDisabled(saving)
-        .errorAlert($error, title: savedToHealth ? "Saved, with a local update issue" : "Couldn’t log drink")
+        .errorAlert($error, title: savedToHealth ? "Saved, with a local update issue" : "Couldn’t log item")
     }
     @MainActor private func log() async {
         guard !saving, !savedToHealth else { return }
@@ -57,7 +57,7 @@ struct LogDrinkSheet: View {
             savedToHealth = true
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             do { try DrinkLibrary.recordLog(for: drink, at: date, in: context); dismiss() }
-            catch { self.error = "Your drink is saved in Apple Health. Tally couldn’t update this template’s usage count. Don’t log it again. \(error.localizedDescription)" }
+            catch { self.error = "Your entry is saved in Apple Health. Tally couldn’t update this template’s usage count. Don’t log it again. \(error.localizedDescription)" }
         } catch { self.error = error.localizedDescription }
     }
 }
