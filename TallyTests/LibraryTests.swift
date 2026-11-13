@@ -34,6 +34,7 @@ final class LibraryTests: XCTestCase {
         XCTAssertEqual(DrinkOrdering.sorted([unknown, zero, coffee], by: .caffeineDescending).map(\.name), ["Coffee", "Chai", "Unknown"])
         XCTAssertEqual(DrinkOrdering.quickLog([unknown, zero, coffee]).first?.name, "Chai")
     }
+    #if DEBUG
     func testDevelopmentExamplesNeverInventUnknownNutrition() throws {
         let container = try ModelContainer(for: SavedDrink.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
         try DevelopmentData.seed(in: container.mainContext, defaults: nil)
@@ -43,4 +44,5 @@ final class LibraryTests: XCTestCase {
         XCTAssertEqual(drinks.first { $0.name == "Iced Mocha" }?.volumeMl, 470)
         XCTAssertEqual(drinks.first { $0.brandOrLocation == "Starbucks" }?.caffeineMg, 125)
     }
+    #endif
 }

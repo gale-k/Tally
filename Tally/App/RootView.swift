@@ -10,11 +10,7 @@ struct RootView: View {
             Tab("Today", systemImage: "sun.max", value: 0) { NavigationStack { TodayView { selected = 1 } } }
             Tab("Drinks", systemImage: "cup.and.saucer", value: 1) { NavigationStack { DrinksView() } }
             Tab("History", systemImage: "clock", value: 2) { NavigationStack { HistoryView() } }
-            Tab("Settings", systemImage: "gearshape", value: 3) {
-                NavigationStack {
-                    Form { Text("Saved drinks stay on this device. Logged nutrition is saved to Apple Health.") }.navigationTitle("Settings")
-                }
-            }
+            Tab("Settings", systemImage: "gearshape", value: 3) { NavigationStack { SettingsView() } }
         }
         .task { await health.refresh() }
         .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await health.refresh() } } }
