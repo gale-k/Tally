@@ -1,28 +1,22 @@
 import SwiftUI
 
-/// Each tab owns its native navigation stack and keeps modal flows independent.
+/// Foreground and manual refreshes pick up changes made in Health or another app without persisting a second history.
 struct RootView: View {
+    @Environment(HealthKitManager.self) private var health
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var selected = 0
     var body: some View {
-        TabView {
-            Tab("Today", systemImage: "sun.max") {
+        TabView(selection: $selected) {
+            Tab("Today", systemImage: "sun.max", value: 0) { NavigationStack { TodayView { selected = 1 } } }
+            Tab("Drinks", systemImage: "cup.and.saucer", value: 1) { NavigationStack { DrinksView() } }
+            Tab("History", systemImage: "clock", value: 2) { NavigationStack { HistoryView() } }
+            Tab("Settings", systemImage: "gearshape", value: 3) {
                 NavigationStack {
-                    ContentUnavailableView("A little more mindful", systemImage: "cup.and.saucer.fill",
-                                           description: Text("Your everyday drinks, connected to Apple Health."))
-                        .navigationTitle("Today")
-                }
-            }
-            Tab("Drinks", systemImage: "cup.and.saucer") {
-                NavigationStack { DrinksView() }
-            }
-            Tab("History", systemImage: "clock") {
-                NavigationStack { Text("Consumption history is read from Apple Health.").padding().navigationTitle("History") }
-            }
-            Tab("Settings", systemImage: "gearshape") {
-                NavigationStack {
-                    Form { Text("Saved drinks stay on this device. Logged nutrition is saved to Apple Health.") }
-                        .navigationTitle("Settings")
+                    Form { Text("Saved drinks stay on this device. Logged nutrition is saved to Apple Health.") }.navigationTitle("Settings")
                 }
             }
         }
+        .task { await health.refresh() }
+        .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await health.refresh() } } }
     }
 }

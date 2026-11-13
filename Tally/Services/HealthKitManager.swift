@@ -12,6 +12,7 @@ final class HealthKitManager {
     private(set) var isSaving = false
     private(set) var samples: [HealthSample] = []
     private(set) var events: [ConsumptionEvent] = []
+    private(set) var historyDays: [HistoryDay] = []
     private(set) var today = NutritionValues()
     private(set) var caffeineDays: [CaffeineDay] = []
     private(set) var limitedDates: [Nutrient: Date] = [:]
@@ -54,11 +55,12 @@ final class HealthKitManager {
             let records = try await client.samples(in: DateWindows.recent(days: 30, now: now))
             let limits = try await client.limitedReadDates()
             let grouped = try HealthAggregation.events(records, ownBundle: client.ownBundleIdentifier)
+            let history = try HealthAggregation.historyDays(records, events: grouped)
             let daily = try HealthAggregation.totals(records.filter { DateWindows.contains($0.date, in: DateWindows.day(containing: now)) })
             let trend = try HealthAggregation.caffeineDays(records, count: 7, now: now)
             // A stale foreground refresh must not overwrite a newer post-save response.
             guard refreshID == token else { return }
-            samples = records; events = grouped; today = daily; caffeineDays = trend
+            samples = records; events = grouped; historyDays = history; today = daily; caffeineDays = trend
             limitedDates = limits; queryError = nil; lastRefreshed = now
         } catch {
             guard refreshID == token else { return }

@@ -47,6 +47,13 @@ struct ConsumptionEvent: Identifiable, Sendable {
     var nutrition: NutritionValues
 }
 
+struct HistoryDay: Identifiable, Sendable {
+    var date: Date
+    var events: [ConsumptionEvent]
+    var totals: NutritionValues
+    var id: Date { date }
+}
+
 struct CaffeineDay: Identifiable, Sendable {
     var date: Date
     var total: Double?
@@ -95,6 +102,14 @@ enum HealthAggregation {
                                     brand: own ? first.brand : nil, size: own ? first.size : nil,
                                     sourceName: first.sourceName, isFromTally: own, nutrition: try totals(records))
         }.sorted { $0.date == $1.date ? $0.id < $1.id : $0.date > $1.date }
+    }
+
+    static func historyDays(_ samples: [HealthSample], events: [ConsumptionEvent], calendar: Calendar = .current) throws -> [HistoryDay] {
+        let sampleDays = Dictionary(grouping: samples) { calendar.startOfDay(for: $0.date) }
+        let eventDays = Dictionary(grouping: events) { calendar.startOfDay(for: $0.date) }
+        return try eventDays.map { date, events in
+            HistoryDay(date: date, events: events.sorted { $0.date > $1.date }, totals: try totals(sampleDays[date] ?? []))
+        }.sorted { $0.date > $1.date }
     }
 
     static func caffeineDays(_ samples: [HealthSample], count: Int, now: Date = .now,
