@@ -58,12 +58,16 @@ Deletions are durable tombstone records without a template payload, preventing o
 
 Switching/signing out of iCloud pauses sync and keeps local templates. The previous account binding is retained. Connecting the retained library to a different account requires a separate confirmation; only then are the old account’s engine checkpoint, record change tags, and tombstones discarded locally. The previous account’s remote library is not deleted. This deliberately merges the retained local templates into the newly selected account, as the confirmation explains.
 
-“Connected” means no local pending changes, not proof that every other device is current. “Last completed exchange” records an error-free send with no remaining local changes. Scheduling and transient network retries are owned by `CKSyncEngine`; foreground/manual sync also checks account identity and fetches before sending. Permanent errors retain pending data and require a retry. See [iCloud sync and recovery](ICLOUD_SYNC.md) for setup, operational behaviour, and recovery.
+Conflict errors can reference a server record without a locally downloadable asset. The delegate explicitly fetches the complete current server copy and rechecks engine/account identity before merging. Manual sending retries only complete optimistic-save conflicts after the delegate resolves them; other or mixed errors remain visible. Replayed zone-deletion notices cannot revoke an explicit reconnection while its new zone creation is pending.
+
+“Connected” means no local pending changes, not proof that every other device is current. “Last completed exchange” records a completed exchange, after any expected conflicts are resolved, with no remaining local changes. Scheduling and transient network retries are owned by `CKSyncEngine`; foreground/manual sync also checks account identity and fetches before sending. Permanent errors retain pending data and require a retry. See [iCloud sync and recovery](ICLOUD_SYNC.md) for setup, operational behaviour, and recovery.
 
 ## Development fixtures
 
 `DevelopmentData.swift` contains only six synthetic food and drink Debug presets; demonstration amounts are not a nutrition reference. The original `developmentPresetsSeeded.v1` marker is retained, so upgrades never insert a second batch. The persistent once-only marker is set after a successful batch save. Normal app launches do not auto-seed.
 
-`UITestFixtures.swift` is Debug-only. `--ui-testing` selects an in-memory SwiftData store and `FixtureNutritionStore`. CloudKit access is also prohibited in this mode. Additional arguments select seeded templates, synthetic history, dark appearance, accessibility text sizes, and permission/query failure states. These test arguments and synthetic health samples do not exist in Release behavior.
+`UITestFixtures.swift` is Debug-only. `--ui-testing` selects an in-memory SwiftData store and `FixtureNutritionStore`. CloudKit access is also prohibited in this mode. The separate Debug-only `--isolated-test-host` flag provides an empty app store and fake Health adapter without resetting preferences, for opt-in physical live tests whose clients have their own stores, zones, assets and subscriptions. Additional arguments select seeded templates, synthetic history, dark appearance, accessibility text sizes, and permission/query failure states. These test arguments and synthetic health samples do not exist in Release behavior.
 
 Shortcuts, widgets, controls, photos, and undo are optional follow-up features; the core app does not expose them.
+
+The [live verification guide](LIVE_ICLOUD_VERIFICATION.md) documents the explicitly gated physical CloudKit and Mac iCloud Drive helpers, actual results, cleanup, and limits. Ordinary suites skip the live test.

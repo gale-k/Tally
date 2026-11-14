@@ -274,6 +274,34 @@ final class SyncTests: XCTestCase {
         }
     }
 
+    func testCustomVerificationZoneCannotDecodeOrReuseProductionRecords() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("TallyZoneCodec-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let item = SavedDrink(name: "Synthetic")
+        let value = change(item, date: .now)
+        let zone = CKRecordZone.ID(zoneName: "TallyCloudVerification-" + UUID().uuidString)
+        let record = try CloudTemplateCodec.record(for: value, systemFields: nil, assetDirectory: folder, zoneID: zone)
+        XCTAssertEqual(record.recordID.zoneID, zone)
+        XCTAssertEqual(try CloudTemplateCodec.change(from: record, zoneID: zone), value)
+        XCTAssertThrowsError(try CloudTemplateCodec.change(from: record))
+        XCTAssertThrowsError(try CloudTemplateCodec.acknowledgedRevision(from: record))
+        XCTAssertThrowsError(try CloudTemplateCodec.record(for: value, systemFields: CloudTemplateCodec.systemFields(record), assetDirectory: folder))
+    }
+
+    func testOnlyCompleteRecordConflictsAreTreatedAsResolvedRetries() throws {
+        let record = CKRecord(recordType: CloudTemplateCodec.recordType)
+        let conflict = CKError(.serverRecordChanged, userInfo: [CKRecordChangedErrorServerRecordKey: record])
+        XCTAssertTrue(CloudSyncFailure.isRecordConflict(conflict))
+        let partial = CKError(.partialFailure, userInfo: [CKPartialErrorsByItemIDKey: ["item": conflict]])
+        XCTAssertTrue(CloudSyncFailure.isRecordConflict(partial))
+        let mixed = CKError(.partialFailure, userInfo: [CKPartialErrorsByItemIDKey: ["conflict": conflict, "quota": CKError(.quotaExceeded)]])
+        XCTAssertFalse(CloudSyncFailure.isRecordConflict(mixed))
+        XCTAssertFalse(CloudSyncFailure.isRecordConflict(CKError(.partialFailure)))
+        XCTAssertFalse(CloudSyncFailure.isRecordConflict(CKError(.serverRecordChanged)))
+        XCTAssertFalse(CloudSyncFailure.isRecordConflict(CKError(.notAuthenticated)))
+        XCTAssertFalse(CloudSyncFailure.isRecordConflict(CKError(.networkFailure)))
+    }
+
     func testSnapshotDecodePerformance() throws {
         // A realistic larger template library exercises optional values, estimates, dates, and notes during backup recovery.
         let data = try DrinkExportService.export((0..<500).map { SavedDrink(name: "Food \($0)", nutrition: .init(calories: 250, protein: 18, estimated: [.protein]), notes: String(repeating: "Serving note. ", count: 20)) })

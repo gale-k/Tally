@@ -7,25 +7,25 @@ enum CloudTemplateCodec {
     static let containerID = "iCloud.gale-k.Tally"
     static let zoneID = CKRecordZone.ID(zoneName: "TallyLibrary")
     static let recordType = "TallyTemplate"
-    static func recordID(_ id: UUID) -> CKRecord.ID { CKRecord.ID(recordName: id.uuidString, zoneID: zoneID) }
+    static func recordID(_ id: UUID, zoneID: CKRecordZone.ID? = nil) -> CKRecord.ID { CKRecord.ID(recordName: id.uuidString, zoneID: zoneID ?? Self.zoneID) }
 
     static func systemFields(_ record: CKRecord) -> Data {
         let coder = NSKeyedArchiver(requiringSecureCoding: true)
         record.encodeSystemFields(with: coder); coder.finishEncoding()
         return coder.encodedData
     }
-    static func record(for change: CloudTemplateChange, systemFields: Data?, assetDirectory: URL) throws -> CKRecord {
+    static func record(for change: CloudTemplateChange, systemFields: Data?, assetDirectory: URL, zoneID: CKRecordZone.ID? = nil) throws -> CKRecord {
         try change.validate()
         let record: CKRecord
         if let systemFields {
             let coder = try NSKeyedUnarchiver(forReadingFrom: systemFields)
             coder.requiresSecureCoding = true
             defer { coder.finishDecoding() }
-            guard let decoded = CKRecord(coder: coder), decoded.recordID == recordID(change.id), decoded.recordType == recordType else {
+            guard let decoded = CKRecord(coder: coder), decoded.recordID == recordID(change.id, zoneID: zoneID), decoded.recordType == recordType else {
                 throw LibrarySyncError.invalidRecord
             }
             record = decoded
-        } else { record = CKRecord(recordType: recordType, recordID: recordID(change.id)) }
+        } else { record = CKRecord(recordType: recordType, recordID: recordID(change.id, zoneID: zoneID)) }
         record["version"] = 1
         record["editedAt"] = change.modifiedAt
         record["revision"] = change.revision
@@ -42,15 +42,15 @@ enum CloudTemplateCodec {
         return record
     }
     /// Acknowledgements need identity/revision only, so cached asset-file availability cannot block a successful upload.
-    static func acknowledgedRevision(from record: CKRecord) throws -> (id: UUID, revision: String) {
-        guard record.recordType == recordType, record.recordID.zoneID == zoneID,
+    static func acknowledgedRevision(from record: CKRecord, zoneID: CKRecordZone.ID? = nil) throws -> (id: UUID, revision: String) {
+        guard record.recordType == recordType, record.recordID.zoneID == (zoneID ?? Self.zoneID),
               let id = UUID(uuidString: record.recordID.recordName), record["version"] as? Int == 1,
               let revision = record["revision"] as? String, UUID(uuidString: revision) != nil else { throw LibrarySyncError.invalidRecord }
         return (id, revision)
     }
 
-    static func change(from record: CKRecord) throws -> CloudTemplateChange {
-        guard record.recordType == recordType, record.recordID.zoneID == zoneID,
+    static func change(from record: CKRecord, zoneID: CKRecordZone.ID? = nil) throws -> CloudTemplateChange {
+        guard record.recordType == recordType, record.recordID.zoneID == (zoneID ?? Self.zoneID),
               let id = UUID(uuidString: record.recordID.recordName), let version = record["version"] as? Int, version == 1,
               let date = record["editedAt"] as? Date, let revision = record["revision"] as? String,
               let deleted = record["deleted"] as? Bool else { throw LibrarySyncError.invalidRecord }

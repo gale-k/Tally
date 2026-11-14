@@ -50,12 +50,14 @@ Tally has no custom backend, Tally account, ads, or analytics. The only app-mana
 
 Live sync propagates edits and deletions; it is not an independent backup. **Settings → Backups & Restore → Export Library Snapshot** creates a manual version-1 JSON snapshot. Choose iCloud Drive in Files to keep a recovery copy there. Imports add missing UUIDs and keep existing templates unchanged. **Restore Snapshot as New Copies** creates fresh identities after confirmation, allowing recovery of older versions without overwriting current templates. These actions exclude consumption dates, usage counts, and Health history. See [iCloud sync and recovery](docs/ICLOUD_SYNC.md) for conflicts, account changes, and recovery steps.
 
-See [the data and architecture notes](docs/DATA_AND_ARCHITECTURE.md) for event grouping, save boundaries, and the JSON contract, and [local verification](docs/VERIFICATION.md) for the initial app checks. The [general nutrition verification](docs/ISSUE_2_VERIFICATION.md) records the theme-change checks. [iCloud verification](docs/ISSUE_1_VERIFICATION.md) records the current local tests, successful signed iPhone installation and launch, and remaining live iCloud checks.
+See [the data and architecture notes](docs/DATA_AND_ARCHITECTURE.md) for event grouping, save boundaries, and the JSON contract, and [local verification](docs/VERIFICATION.md) for the initial app checks. The [general nutrition verification](docs/ISSUE_2_VERIFICATION.md) records the theme-change checks. [iCloud verification](docs/ISSUE_1_VERIFICATION.md) records the current local tests, successful signed iPhone installation and launch, and the later [live CloudKit and iCloud Drive checks](docs/LIVE_ICLOUD_VERIFICATION.md), including their remaining device/UI limits.
 
 ## Development
 
 Swift 6, SwiftUI, SwiftData, CloudKit (`CKSyncEngine`), HealthKit, and Swift Charts. Apple frameworks only; there are no third-party package dependencies.
 
 Run all verification locally with isolated DerivedData under `/private/tmp`. No GitHub Actions workflow is configured. UI tests use an in-memory library, a synthetic Health adapter, and disabled CloudKit access; they never contact the real Health store or iCloud.
+
+Optional live verification uses uniquely owned Development CloudKit scratch resources and a synthetic iCloud Drive snapshot. It is explicitly gated and skipped by ordinary tests; see [live verification](docs/LIVE_ICLOUD_VERIFICATION.md) before running the helpers.
 
 The neutral plate-and-tally icon has reproducible native drawing source in [Design/RenderAppIcon.swift](Design/RenderAppIcon.swift).
