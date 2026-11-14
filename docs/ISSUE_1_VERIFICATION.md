@@ -1,6 +1,6 @@
 # iCloud library verification — issue #1
 
-Verification ran locally on Kai’s Mac on 13 November 2026, using Xcode 27.0 (27A266a), the installed iOS 27 SDK, and the unchanged iOS 27 deployment target. No GitHub-hosted Actions were triggered or used.
+Initial verification ran locally on Kai’s Mac on 13 November 2026, using Xcode 27.0 (27A266a), the installed iOS 27 SDK, and the unchanged iOS 27 deployment target. The 14 November follow-up below records successful signed installation and launch on the physical iPhone. No GitHub-hosted Actions were triggered or used.
 
 ## Implementation and scope
 
@@ -8,7 +8,7 @@ Optional private CloudKit sync uses `CKSyncEngine`, a transactional local templa
 
 Version-1 JSON snapshots remain supported. Ordinary import is additive/idempotent; explicit restore-as-copies recovers older values under fresh UUIDs without overwriting current templates. Files/iCloud Drive selection is user-directed and backups are manual. Setup and recovery are documented in [ICLOUD_SYNC.md](ICLOUD_SYNC.md), and implementation boundaries in [DATA_AND_ARCHITECTURE.md](DATA_AND_ARCHITECTURE.md).
 
-## Results
+## Results — 13 November 2026
 
 - Final reviewed complete suite: **67 passed, 0 failed, 0 skipped** (53 unit tests, including the snapshot performance measurement, and 14 UI tests); the result summary contains **0 runtime warnings**.
 - Actual system accessibility-size check: **1 UI test passed**. Exported captures of iCloud status, confirmation, and backup actions were opened and visually reviewed. The native confirmation fits at accessibility size 3; controls and wrapped labels remain reachable.
@@ -99,8 +99,33 @@ An initial Simulator compile exposed a throwing-expression syntax error in first
 
 A subsequent complete run with result path `tally-issue1-final-tests.xcresult` passed **65 tests** before the final zone-removal/error regression additions. The final reviewed run above includes those additions. No failed diagnostic run is counted as a pass.
 
-## Remaining prerequisites
+## Remaining prerequisites at the end of 13 November
 
 Sign into the Apple Developer account in Xcode, create/select `iCloud.gale-k.Tally`, and regenerate provisioning with CloudKit and Push Notifications. Retry the signed build, then install and launch the actual new signed build on the physical iPhone. Only then perform the synthetic-data two-device checklist in [ICLOUD_SYNC.md](ICLOUD_SYNC.md#two-device-verification-still-required), including manual iCloud Drive export/recovery. Check/deploy the CloudKit Production schema before distribution.
 
 Issue #1 remains open: local compiler/model/UI evidence does not satisfy its live two-device acceptance criteria. No push, pull request, merge, or issue closure is performed for this task. Task-specific DerivedData, logs, result bundles, diagnostic exports and the isolated QA simulator are removed after verification; the documentation is retained as the verification record.
+
+## Physical-install follow-up — 14 November 2026
+
+**The signed Debug build succeeded, installed on the physical iPhone 17 Pro Max, and launched successfully.** A subsequent device-process query confirmed Tally remained running. The implementation is unchanged from commit `c190873`; this follow-up changes documentation only.
+
+The initial retry recognised the developer account but Apple rejected provisioning with “PLA Update available”. After the Account Holder accepted the updated Program License Agreement, rerunning the same build succeeded and Xcode updated the provisioning profile. Apple documents that [pending agreement acceptance blocks automatic signing and Certificates, Identifiers & Profiles](https://developer.apple.com/help/account/access/resolving-access-issues).
+
+Code-signature verification succeeded. The signed app contains the HealthKit entitlement, the `iCloud.gale-k.Tally` container, the `CloudKit` service, and the `development` push environment. No capability was removed to make installation possible. The first installation attempt encountered a wireless connection reset; refreshing the paired-device list and retrying installation succeeded.
+
+Exact successful commands follow. `TALLY_DEVICE_ID` represents the connected iPhone identifier; the private value is deliberately omitted:
+
+```sh
+xcodebuild -project Tally.xcodeproj -scheme Tally -destination 'generic/platform=iOS' -derivedDataPath /private/tmp/tally-phone-retry-derived-data -allowProvisioningUpdates build
+codesign --verify --strict --verbose=2 /private/tmp/tally-phone-retry-derived-data/Build/Products/Debug-iphoneos/Tally.app
+codesign -d --entitlements - --xml /private/tmp/tally-phone-retry-derived-data/Build/Products/Debug-iphoneos/Tally.app
+xcrun devicectl --timeout 20 list devices
+xcrun devicectl --timeout 45 device install app --device "$TALLY_DEVICE_ID" /private/tmp/tally-phone-retry-derived-data/Build/Products/Debug-iphoneos/Tally.app
+xcrun devicectl --timeout 20 device process launch --terminate-existing --device "$TALLY_DEVICE_ID" gale-k.Tally
+xcrun devicectl --timeout 20 device info processes --device "$TALLY_DEVICE_ID" --search Tally
+git diff --check
+```
+
+The signing command first failed with the agreement/provisioning errors above, then passed after acceptance. The initial failed installation used the same install command without `--timeout 45`. The earlier 67-test result remains the local regression evidence for the unchanged implementation; no simulator suite was rerun for this signing/deployment-only follow-up. Temporary signing-build DerivedData and logs are removed after recording results.
+
+Live CloudKit exchanges, two-device convergence, iCloud Drive snapshot recovery, real Health sample checks, spoken VoiceOver, and Production CloudKit schema deployment remain unverified. Issue #1 stays open for its outstanding live-service/device acceptance checks. No push, pull request, merge, or issue closure is performed in this follow-up.
