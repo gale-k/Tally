@@ -79,7 +79,7 @@ struct DrinksView: View {
         .navigationTitle("Library")
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
-                Button("Quick Add", systemImage: "bolt.badge.plus") { sheet = .quickAdd }
+                Button("Quick Add", systemImage: "plus.circle") { sheet = .quickAdd }
                 Button("Add Item", systemImage: "plus") { sheet = .add }.accessibilityIdentifier("addDrink")
             }
         }

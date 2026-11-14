@@ -63,7 +63,7 @@ struct TodayView: View {
                     }
                 }
                 Button { sheet = .quickAdd } label: {
-                    Label("Quick Add a one-off entry", systemImage: "bolt.badge.plus").frame(maxWidth: .infinity, minHeight: 32)
+                    Label("Quick Add a one-off entry", systemImage: "plus.circle").frame(maxWidth: .infinity, minHeight: 32)
                 }.buttonStyle(.bordered)
                 if showCaffeine { CaffeineTrendView(days: health.caffeineDays) }
             }.padding(20)
@@ -74,7 +74,7 @@ struct TodayView: View {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 if health.isLoading { ProgressView().accessibilityLabel("Refreshing Apple Health") }
                 Menu {
-                    Button("Quick Add", systemImage: "bolt.badge.plus") { sheet = .quickAdd }
+                    Button("Quick Add", systemImage: "plus.circle") { sheet = .quickAdd }
                     Button("Add Saved Item", systemImage: "plus") { sheet = .add }
                 } label: { Image(systemName: "plus") }.accessibilityLabel("Add food or drink")
             }
