@@ -1,10 +1,11 @@
 import SwiftUI
 import SwiftData
 
-/// Tally has one local-only container. A store error is shown instead of discarding the library.
+/// Tally keeps one local container; optional CloudKit sync transfers only explicit template records. A store error is shown instead of discarding the library.
 @main
 struct TallyApp: App {
     @State private var health: HealthKitManager
+    @State private var sync: LibrarySyncManager?
     private let container: ModelContainer?
     private let startupError: String?
 
@@ -24,13 +25,14 @@ struct TallyApp: App {
         #endif
         do {
             let configuration = ModelConfiguration("Tally", isStoredInMemoryOnly: uiTesting, cloudKitDatabase: .none)
-            let created = try ModelContainer(for: SavedDrink.self, configurations: configuration)
+            let created = try LibraryStore.container(configuration: configuration)
             created.mainContext.autosaveEnabled = false
             #if DEBUG
             if uiTesting && ProcessInfo.processInfo.arguments.contains("--seed-library") {
                 try DevelopmentData.seed(in: created.mainContext, defaults: nil)
             }
             #endif
+            _sync = State(initialValue: try LibrarySyncManager(context: created.mainContext, allowsCloudAccess: !uiTesting))
             container = created
             startupError = nil
         } catch {
@@ -41,11 +43,11 @@ struct TallyApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if let container {
+            if let container, let sync {
                 #if DEBUG
-                RootView().modelContainer(container).environment(health).tint(Color.accentColor).modifier(DevelopmentAppearance())
+                RootView().modelContainer(container).environment(health).environment(sync).tint(Color.accentColor).modifier(DevelopmentAppearance())
                 #else
-                RootView().modelContainer(container).environment(health).tint(Color.accentColor)
+                RootView().modelContainer(container).environment(health).environment(sync).tint(Color.accentColor)
                 #endif
             } else {
                 ContentUnavailableView("Your library couldn’t open", systemImage: "externaldrive.badge.exclamationmark",

@@ -19,7 +19,7 @@ final class ExportTests: XCTestCase {
         XCTAssertNil(restored.caloriesKcal)
     }
     func testImportIsAdditiveAndIdempotent() throws {
-        let container = try ModelContainer(for: SavedDrink.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let container = try LibraryStore.container(configuration: ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none))
         let original = SavedDrink(name: "Coffee", nutrition: .init(caffeine: 100))
         let data = try DrinkExportService.export([original])
         let first = try DrinkExportService.importDrinks(data, into: container.mainContext)
@@ -42,7 +42,7 @@ final class ExportTests: XCTestCase {
         XCTAssertEqual(try DrinkExportService.decode(valid).count, 1)
     }
     func testInvalidLaterRecordDoesNotPartiallyImport() throws {
-        let container = try ModelContainer(for: SavedDrink.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let container = try LibraryStore.container(configuration: ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none))
         var invalid = SavedDrinkRecord(SavedDrink(name: "Invalid"))
         invalid.nutrition.caffeine = -1
         let backup = SavedDrinkBackup(drinks: [SavedDrinkRecord(SavedDrink(name: "Valid")), invalid])
@@ -64,7 +64,7 @@ final class ExportTests: XCTestCase {
         let legacy = Data(#"""
         {"version":1,"drinks":[{"id":"4E93230F-C553-448F-82CE-8EE829BB0A53","name":"Legacy Coffee","brandOrLocation":"Fuel","size":"Iced","volumeMl":470,"category":"coffee","servingStyle":"iced","nutrition":{"caffeine":100,"estimated":["caffeine"]},"isFavourite":true,"createdAt":"2026-11-01T10:00:00Z","updatedAt":"2026-11-01T10:00:00Z"}]}
         """#.utf8)
-        let container = try ModelContainer(for: SavedDrink.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let container = try LibraryStore.container(configuration: ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none))
         XCTAssertEqual(try DrinkExportService.importDrinks(legacy, into: container.mainContext).imported, 1)
         let item = try XCTUnwrap(container.mainContext.fetch(FetchDescriptor<SavedDrink>()).first)
         XCTAssertEqual(item.category, .coffee)

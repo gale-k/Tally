@@ -251,6 +251,43 @@ final class TallyUITests: XCTestCase {
         XCTAssertTrue(findings.isEmpty, findings.joined(separator: "\n"))
     }
 
+    /// The real Settings flow asks before opt-in; a failed cloud connection must leave local templates usable.
+    func testCloudOptInFailurePreservesLocalLibraryAndBackupActions() {
+        let app = launch(["--seed-library"])
+        app.tabBars.buttons["Settings"].tap()
+        let enable = app.buttons["Enable iCloud Sync"]
+        reveal(enable, in: app)
+        capture("iCloud-Off-Light", app)
+        enable.tap()
+        XCTAssertTrue(app.buttons["Enable Sync"].waitForExistence(timeout: 5))
+        capture("iCloud-Confirmation", app)
+        app.buttons["Enable Sync"].tap()
+        // UI fixtures prohibit CloudKit access, producing the same local-safe error presentation without a real account.
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "iCloud is unavailable right now")).firstMatch.waitForExistence(timeout: 5))
+        capture("iCloud-Unavailable", app)
+        reveal(app.buttons["Restore Snapshot as New Copies"], in: app)
+        XCTAssertTrue(app.buttons["Export Library Snapshot"].exists)
+        XCTAssertTrue(app.buttons["Import Library"].exists)
+        capture("Backups-And-Restore", app)
+        app.tabBars.buttons["Library"].tap()
+        XCTAssertTrue(app.buttons["drink.Iced Mocha"].exists)
+    }
+
+    func testCloudSettingsDarkAndLargeText() {
+        let app = launch(["--seed-library", "--dark-mode", "--large-text"])
+        app.tabBars.buttons["Settings"].tap()
+        reveal(app.buttons["Enable iCloud Sync"], in: app)
+        capture("iCloud-Dark-Accessibility3", app)
+        app.buttons["Enable iCloud Sync"].tap()
+        capture("iCloud-Confirmation-Dark-Accessibility3", app)
+        // The compact native popover on this runtime dismisses by tapping outside, without a Cancel row.
+        XCTAssertTrue(app.buttons["Enable Sync"].waitForExistence(timeout: 5))
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: 0.15)).tap()
+        XCTAssertTrue(app.buttons["Enable Sync"].waitForNonExistence(timeout: 5))
+        reveal(app.buttons["Restore Snapshot as New Copies"], in: app)
+        capture("Backups-Dark-Accessibility3", app)
+    }
+
     // SwiftUI Forms lazily expose off-screen fields. Scroll until the actual target is visible, including after keyboard dismissal.
     private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
         for _ in 0..<10 {

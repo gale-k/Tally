@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 
 /// The versioned format contains templates only; usage counts, consumption dates, and Health samples are excluded.
-struct SavedDrinkRecord: Codable {
+struct SavedDrinkRecord: Codable, Equatable, Sendable {
     var id: UUID
     var name: String
     var brandOrLocation: String?
@@ -41,10 +41,16 @@ struct SavedDrinkBackup: Codable {
     var drinks: [SavedDrinkRecord]
 }
 
+/// Ordinary import remains additive/idempotent; explicit snapshot recovery can create independent copies instead.
+enum LibraryImportMode { case addMissing, restoreCopies }
+
 struct DrinkImportReport {
     var imported: Int
     var skipped: Int
-    var message: String { "Imported \(imported) \(imported == 1 ? "item" : "items"). \(skipped) already in your library. Existing items were kept unchanged." }
+    var restoredCopies = false
+    var message: String {
+        if restoredCopies { return "Restored \(imported) templates as new copies. Existing templates and Apple Health history were kept unchanged." }
+        return "Imported \(imported) \(imported == 1 ? "item" : "items"). \(skipped) already in your library. Existing items were kept unchanged." }
 }
 
 enum LibraryTransferError: LocalizedError {
@@ -93,16 +99,22 @@ enum DrinkExportService {
         guard data.count <= maximumBytes else { throw LibraryTransferError.tooLarge }
         return data
     }
-    static func importDrinks(_ data: Data, into context: ModelContext) throws -> DrinkImportReport {
+    static func importDrinks(_ data: Data, into context: ModelContext, mode: LibraryImportMode = .addMissing) throws -> DrinkImportReport {
         // Validate the complete file before inserting anything, then persist additions as one batch.
         let records = try decode(data)
         guard !context.hasChanges else { throw LibraryTransferError.pendingChanges }
         let existing = Set(try context.fetch(FetchDescriptor<SavedDrink>()).map(\.id))
-        let additions = records.filter { !existing.contains($0.id) }
+        let additions = mode == .restoreCopies ? records.map { original in
+            var copy = original; copy.id = UUID(); return copy
+        } : records.filter { !existing.contains($0.id) }
         do {
-            for record in additions { context.insert(record.makeDrink()) }
+            for record in additions {
+                let item = record.makeDrink()
+                context.insert(item)
+                try LibrarySyncStore.stage(item, in: context)
+            }
             try context.save()
         } catch { context.rollback(); throw error }
-        return DrinkImportReport(imported: additions.count, skipped: records.count - additions.count)
+        return DrinkImportReport(imported: additions.count, skipped: records.count - additions.count, restoredCopies: mode == .restoreCopies)
     }
 }
