@@ -257,6 +257,82 @@ final class TallyUITests: XCTestCase {
         capture("Food-History-Detail", app)
     }
 
+    /// Salt is an alternate input for one sodium value, retained through editing and historical logging.
+    func testSodiumAndSaltCanBeSavedConvertedAndLogged() {
+        verifySodiumAndSaltEditor()
+    }
+    func testSodiumAndSaltWithLargeText() {
+        verifySodiumAndSaltEditor(["--dark-mode", "--large-text"])
+    }
+    private func verifySodiumAndSaltEditor(_ arguments: [String] = []) {
+        let app = launch(arguments)
+        let suffix = arguments.isEmpty ? "" : "-LargeText"
+        app.tabBars.buttons["Library"].tap()
+        app.buttons["addDrink"].tap()
+        let name = app.textFields["drinkName"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        name.tap(); name.typeText("Salty Soup")
+        let more = app.buttons["More Nutrition"]
+        reveal(more, in: app); more.tap()
+        let unit = app.buttons["sodiumInputUnit"]
+        reveal(unit, in: app); unit.tap()
+        app.buttons["Salt (g)"].tap()
+        let sodium = app.textFields["nutrition.sodium"]
+        reveal(sodium, in: app)
+        XCTAssertEqual(sodium.label, "Salt, g")
+        sodium.tap(); sodium.typeText("1.25")
+        app.buttons["estimate.sodium"].tap()
+        capture("Salt-Input" + suffix, app)
+        reveal(unit, in: app); unit.tap(); app.buttons["Sodium (mg)"].tap()
+        XCTAssertEqual(sodium.value as? String, "500")
+        XCTAssertEqual(sodium.label, "Sodium, mg")
+        app.buttons["saveDrink"].tap()
+        let item = app.buttons["drink.Salty Soup"]
+        XCTAssertTrue(item.waitForExistence(timeout: 5))
+        XCTAssertTrue(item.label.contains("~500 mg sodium"))
+        app.buttons["More actions for Salty Soup"].tap(); app.buttons["Edit Item"].tap()
+        reveal(more, in: app); more.tap()
+        reveal(sodium, in: app)
+        XCTAssertEqual(sodium.value as? String, "500.0")
+        XCTAssertEqual(app.buttons["estimate.sodium"].value as? String, "Estimated")
+        reveal(unit, in: app); unit.tap(); app.buttons["Salt (g)"].tap()
+        XCTAssertEqual(sodium.value as? String, "1.25")
+        app.buttons["saveDrink"].tap()
+        XCTAssertTrue(item.waitForExistence(timeout: 5)); item.tap()
+        XCTAssertTrue(app.buttons["confirmLogDrink"].waitForExistence(timeout: 5))
+        app.buttons["confirmLogDrink"].tap()
+        XCTAssertTrue(app.buttons["confirmLogDrink"].waitForNonExistence(timeout: 10))
+        app.tabBars.buttons["History"].tap()
+        let event = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "~500 mg sodium")).firstMatch
+        XCTAssertTrue(event.waitForExistence(timeout: 5)); event.tap()
+        XCTAssertTrue(app.staticTexts["Sodium"].exists)
+        capture("Sodium-History" + suffix, app)
+    }
+
+    /// Explicit zero from Quick Add remains visible, even when sodium is the only selected Today card.
+    func testQuickAddSodiumCanAppearOnToday() {
+        let app = launch()
+        app.tabBars.buttons["Settings"].tap()
+        for title in ["Show Calories", "Show Protein", "Show Sugar", "Show Caffeine & Trend", "Show Sodium"] {
+            let toggle = app.switches[title]
+            toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+        }
+        app.tabBars.buttons["Library"].tap(); app.buttons["Quick Add"].tap()
+        let more = app.buttons["More Nutrition"]
+        reveal(more, in: app); more.tap()
+        let sodium = app.textFields["nutrition.sodium"]
+        reveal(sodium, in: app); sodium.tap(); sodium.typeText("0")
+        let log = app.buttons["quickLogToHealth"]
+        reveal(log, in: app); log.tap()
+        XCTAssertTrue(log.waitForNonExistence(timeout: 10))
+        app.tabBars.buttons["Today"].tap()
+        XCTAssertTrue(app.staticTexts["Nutrition Today"].exists)
+        XCTAssertTrue(app.staticTexts["Sodium"].exists)
+        XCTAssertTrue(app.staticTexts["0 mg"].exists)
+        XCTAssertFalse(app.staticTexts["todayCaffeine"].exists)
+        capture("Sodium-Only-Today", app)
+    }
+
     /// Hiding caffeine is a presentation choice; caffeine-only templates remain usable in the same library.
     func testTodayNutrientsCanBeConfiguredWithoutChangingTemplates() {
         let app = launch(["--seed-library", "--populated-health"])
@@ -338,13 +414,17 @@ final class TallyUITests: XCTestCase {
         capture("Backups-Dark-Accessibility3", app)
     }
 
-    // SwiftUI Forms lazily expose off-screen fields. Scroll until the actual target is visible, including after keyboard dismissal.
+    // SwiftUI may call a partially exposed row hittable even when its centre is behind the keyboard.
+    // Reveal its actual tap point, including deeper extended nutrition and targets above the current scroll position.
     private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
-        for _ in 0..<10 {
-            if element.exists && element.isHittable { return }
+        for _ in 0..<20 {
+            let top = app.navigationBars.firstMatch.exists ? app.navigationBars.firstMatch.frame.maxY : app.frame.minY
+            let bottom = app.keyboards.firstMatch.exists ? app.keyboards.firstMatch.frame.minY : app.frame.maxY
+            if element.exists && element.isHittable && element.frame.midY > top && element.frame.midY < bottom - 12 { return }
+            let scrollBack = element.exists && element.frame.midY <= top
             // A short drag avoids jumping past a field when the keyboard reduces the visible Form height.
-            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.05,
-                thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)))
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: scrollBack ? 0.3 : 0.5)).press(forDuration: 0.05,
+                thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: scrollBack ? 0.5 : 0.3)))
         }
         XCTAssertTrue(element.exists && element.isHittable, "Could not reveal \(element)")
     }

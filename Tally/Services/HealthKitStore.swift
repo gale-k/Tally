@@ -13,11 +13,13 @@ extension Nutrient {
         case .totalFat: .dietaryFatTotal
         case .saturatedFat: .dietaryFatSaturated
         case .fibre: .dietaryFiber
+        // Salt inputs have already been converted; Health receives one dietary sodium sample.
+        case .sodium: .dietarySodium
         }
     }
     var healthUnit: HKUnit {
         switch self {
-        case .caffeine: .gramUnit(with: .milli)
+        case .caffeine, .sodium: .gramUnit(with: .milli)
         case .calories: .kilocalorie()
         default: .gram()
         }

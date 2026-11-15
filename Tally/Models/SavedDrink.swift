@@ -72,6 +72,8 @@ final class SavedDrink {
     var totalFatG: Double?
     var saturatedFatG: Double?
     var fibreG: Double?
+    // Additive optional storage preserves existing templates through lightweight migration.
+    var sodiumMg: Double?
     var estimatedNutrients: [String]
     var notes: String?
     var isFavourite: Bool
@@ -100,6 +102,7 @@ final class SavedDrink {
         totalFatG = nutrition.totalFat
         saturatedFatG = nutrition.saturatedFat
         fibreG = nutrition.fibre
+        sodiumMg = nutrition.sodium
         estimatedNutrients = nutrition.estimated.map(\.rawValue).sorted()
         self.notes = notes
         self.isFavourite = isFavourite
@@ -113,12 +116,13 @@ final class SavedDrink {
     var servingStyle: ServingStyle { ServingStyle(rawValue: servingStyleRaw) ?? .other }
     var nutrition: NutritionValues {
         get { .init(caffeine: caffeineMg, calories: caloriesKcal, sugar: sugarG, carbohydrates: carbohydratesG,
-                    protein: proteinG, totalFat: totalFatG, saturatedFat: saturatedFatG, fibre: fibreG,
+                    protein: proteinG, totalFat: totalFatG, saturatedFat: saturatedFatG, fibre: fibreG, sodium: sodiumMg,
                     estimated: Set(estimatedNutrients.compactMap(Nutrient.init(rawValue:)))) }
         set {
             caffeineMg = newValue.caffeine; caloriesKcal = newValue.calories; sugarG = newValue.sugar
             carbohydratesG = newValue.carbohydrates; proteinG = newValue.protein; totalFatG = newValue.totalFat
             saturatedFatG = newValue.saturatedFat; fibreG = newValue.fibre
+            sodiumMg = newValue.sodium
             estimatedNutrients = newValue.estimated.map(\.rawValue).sorted()
         }
     }

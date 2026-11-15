@@ -1,5 +1,16 @@
 import Foundation
 
+/// Label salt is sodium × 2.5 by mass: 1 g salt represents 400 mg sodium.
+/// Only sodium is persisted and logged, so salt can never create a second sample.
+enum SodiumInputUnit: String, CaseIterable, Identifiable {
+    case sodium, salt
+    var id: String { rawValue }
+    var title: String { self == .sodium ? "Sodium" : "Salt" }
+    var unit: String { self == .sodium ? "mg" : "g" }
+    var sodiumMultiplier: Double { self == .sodium ? 1 : 400 }
+    var inputLimit: Double { Nutrient.sodium.inputLimit / sodiumMultiplier }
+}
+
 /// Editors work on a value snapshot, so cancelling cannot mutate a saved template.
 struct DrinkDraft {
     var name = ""
@@ -13,6 +24,8 @@ struct DrinkDraft {
     var notes = ""
     var values: [Nutrient: String] = [:]
     var estimated: Set<Nutrient> = []
+    // Input presentation belongs to the draft; stored templates always reopen in sodium mg.
+    var sodiumInputUnit: SodiumInputUnit = .sodium
 
     init() {}
     init(drink: SavedDrink) {
@@ -32,20 +45,37 @@ struct DrinkDraft {
     }
 
     // Reject malformed text instead of silently turning an invalid entry into an unknown value.
-    static func parse(_ text: String, nutrient: Nutrient, locale: Locale = .current) throws -> Double? {
+    static func parse(_ text: String, nutrient: Nutrient, locale: Locale = .current,
+                      sodiumInputUnit: SodiumInputUnit = .sodium) throws -> Double? {
         guard let trimmed = optionalText(text) else { return nil }
+        // Validate the displayed unit before converting to the canonical stored sodium value.
+        let limit = nutrient == .sodium ? sodiumInputUnit.inputLimit : nutrient.inputLimit
         let separator = locale.decimalSeparator ?? "."
         let normalized = trimmed.replacingOccurrences(of: separator, with: ".")
         guard normalized.range(of: #"^([0-9]+(\.[0-9]*)?|\.[0-9]+)$"#, options: .regularExpression) != nil,
-              let number = Double(normalized), number.isFinite, number >= 0, number <= nutrient.inputLimit else {
-            throw DrinkValidationError.invalidNumber(nutrient.title, nutrient.inputLimit, nutrient.unit)
+              let number = Double(normalized), number.isFinite, number >= 0, number <= limit else {
+            throw DrinkValidationError.invalidNumber(nutrient == .sodium ? sodiumInputUnit.title : nutrient.title,
+                                                    limit, nutrient == .sodium ? sodiumInputUnit.unit : nutrient.unit)
         }
-        return number
+        return nutrient == .sodium ? number * sodiumInputUnit.sodiumMultiplier : number
+    }
+
+    /// Preserve the amount and estimate when changing representation; invalid text stays available for correction.
+    mutating func changeSodiumInputUnit(to unit: SodiumInputUnit, locale: Locale = .current) throws {
+        guard unit != sodiumInputUnit else { return }
+        let sodium = try Self.parse(values[.sodium] ?? "", nutrient: .sodium, locale: locale, sodiumInputUnit: sodiumInputUnit)
+        values[.sodium] = sodium.map {
+            // Enough precision for label amounts without exposing binary floating-point tails after conversion.
+            ($0 / unit.sodiumMultiplier).formatted(.number.locale(locale).grouping(.never).precision(.significantDigits(1...15)))
+        } ?? ""
+        sodiumInputUnit = unit
     }
 
     func nutrition() throws -> NutritionValues {
         var result = NutritionValues()
-        for nutrient in Nutrient.allCases { result[nutrient] = try Self.parse(values[nutrient] ?? "", nutrient: nutrient) }
+        for nutrient in Nutrient.allCases {
+            result[nutrient] = try Self.parse(values[nutrient] ?? "", nutrient: nutrient, sodiumInputUnit: sodiumInputUnit)
+        }
         result.estimated = estimated.intersection(Set(result.knownNutrients))
         try result.validate()
         return result

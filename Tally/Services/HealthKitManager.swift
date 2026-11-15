@@ -40,7 +40,11 @@ final class HealthKitManager {
         try event.validate()
         isSaving = true
         defer { isSaving = false }
-        if !permissionsRequested { try await requestAccess() }
+        // An existing user may have reviewed permissions before a newly supported nutrient was added.
+        // Ask for undecided write types on first use, while leaving explicit denials to Settings.
+        if !permissionsRequested || event.nutrition.knownNutrients.contains(where: { client.writeStatus(for: $0) == .notRequested }) {
+            try await requestAccess()
+        }
         try await client.save(event)
         await refresh()
     }

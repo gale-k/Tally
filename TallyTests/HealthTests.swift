@@ -134,8 +134,14 @@ final class FakeNutritionStore: NutritionStore {
     var saved: [ConsumptionDraft] = []
     var saveError: Error?
     var queryError: Error?
-    func requestAccess() async throws {}
-    func writeStatus(for nutrient: Nutrient) -> NutritionWriteStatus { .allowed }
+    // Tests can model an undecided newly supported type separately from an explicit denial.
+    var accessRequests = 0
+    var writeStatuses: [Nutrient: NutritionWriteStatus] = [:]
+    func requestAccess() async throws {
+        accessRequests += 1
+        for nutrient in Nutrient.allCases where writeStatuses[nutrient] == .notRequested { writeStatuses[nutrient] = .allowed }
+    }
+    func writeStatus(for nutrient: Nutrient) -> NutritionWriteStatus { writeStatuses[nutrient] ?? .allowed }
     func save(_ event: ConsumptionDraft) async throws {
         if let saveError { throw saveError }
         saved.append(event)

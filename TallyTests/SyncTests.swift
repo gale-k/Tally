@@ -82,7 +82,7 @@ final class SyncTests: XCTestCase {
         context.insert(item); try LibrarySyncStore.stage(item, in: context, now: Date(timeIntervalSince1970: 10)); try context.save()
         let remote = SavedDrink(id: item.id, name: "Updated", brandOrLocation: "Example", size: "One serving", volumeMl: 330,
                                 category: .meal, servingStyle: .bottle,
-                                nutrition: .init(caffeine: 110, sugar: 12, carbohydrates: 20, protein: 0, totalFat: 3, saturatedFat: 1, fibre: 2, estimated: [.caffeine, .sugar]),
+                                nutrition: .init(caffeine: 110, sugar: 12, carbohydrates: 20, protein: 0, totalFat: 3, saturatedFat: 1, fibre: 2, sodium: 500, estimated: [.caffeine, .sugar, .sodium]),
                                 notes: "Serving notes", isFavourite: true)
         let incoming = change(remote, date: Date(timeIntervalSince1970: 20))
         try LibrarySyncStore.receive(incoming, systemFields: nil, in: context); try context.save()

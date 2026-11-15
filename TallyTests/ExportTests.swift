@@ -74,6 +74,8 @@ final class ExportTests: XCTestCase {
         XCTAssertEqual(item.nutrition.formatted(.caffeine), "~100 mg")
         XCTAssertTrue(item.isFavourite)
         XCTAssertNil(item.proteinG)
+        // Older snapshots do not invent a sodium amount when the optional key is absent.
+        XCTAssertNil(item.sodiumMg)
     }
     func testFoodCategoriesRoundTripWithoutChangingVersionOneKeys() throws {
         for category in [DrinkCategory.meal, .snack, .fruitVegetables, .dairyAlternatives] {

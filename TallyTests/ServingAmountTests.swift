@@ -84,6 +84,8 @@ final class ServingAmountTests: XCTestCase {
         XCTAssertEqual(stored.id, id)
         XCTAssertEqual(stored.volumeMl, 330)
         XCTAssertNil(stored.weightG)
+        // The same legacy store also upgrades through the optional sodium column.
+        XCTAssertNil(stored.sodiumMg)
         XCTAssertEqual(stored.servingStyle, .iced)
         XCTAssertEqual(stored.caffeineMg, 100)
         XCTAssertEqual(stored.timesLogged, 7)

@@ -7,11 +7,11 @@ A native iPhone nutrition utility for saving your usual foods and drinks and log
 - Save reusable foods and drinks with favourites, brands, serving sizes, notes, and optional nutrition.
 - Find a saved item with search, category filters, five sort orders, and ranked Quick Log cards.
 - Review an item and its time before logging, or use Quick Add for a one-off entry.
-- Choose calorie, protein, sugar, and caffeine summaries on Today, with recent Health history and an optional seven-day caffeine chart.
+- Choose calorie, protein, sugar, caffeine, and sodium summaries on Today, with recent Health history and an optional seven-day caffeine chart.
 - Optionally sync saved templates through your private iCloud storage, with offline edits and explicit account-switch control.
 - Export independent JSON snapshots to Files/iCloud Drive; import missing items or restore older snapshots as new copies.
 
-Supported nutrition: caffeine (mg), energy (kcal), sugar, carbohydrates, protein, total fat, saturated fat, and fibre (g). **Blank means unknown; zero is a real value.** Tap `~` beside a nutrition field to mark it as estimated.
+Supported nutrition: caffeine and sodium (mg), energy (kcal), sugar, carbohydrates, protein, total fat, saturated fat, and fibre (g). Sodium can also be entered as salt (g). **Blank means unknown; zero is a real value.** Tap `~` beside a nutrition field to mark it as estimated.
 
 ## Preview
 
@@ -34,7 +34,9 @@ In Debug builds, **Settings → Development → Add Development Examples** inser
 
 A name is the only required template field. Serving size is free text (for example, “1 bowl” or “330 ml”); amount and serving style are optional. **Amount** can be entered in **ml** or **g**; changing the unit keeps the entered number without converting between volume and weight. Serving styles include **Cold** separately from **Iced**. New items start with no specified style. Food categories sit alongside the existing coffee, tea, pod, and bottled-drink options.
 
-Calories, protein, sugar, and caffeine are immediately accessible in the editor. Carbohydrates, fats, and fibre are under **More Nutrition**. Cards show the known values that best describe each item, so a protein-only food never needs a caffeine placeholder. Configure the Today cards in **Settings → Nutrition on Today**. Hiding caffeine also hides its weekly chart; the personal tracking target remains available in Settings.
+Calories, protein, sugar, and caffeine are immediately accessible in the editor. Carbohydrates, fats, fibre, and sodium/salt are under **More Nutrition**. Choose **Sodium (mg)** or **Salt (g)** to match the label; switching converts the entered amount. Salt uses the [food-label conversion](https://www.foodstandards.gov.scot/consumer-advice/healthy-eating/balanced-diet/understanding-nutrients/salt): 1 g salt = 400 mg sodium. Tally stores and logs one sodium value to Apple Health, and saved items reopen in sodium mg. First use requests any newly needed Health write permission.
+
+Cards show the known values that best describe each item, so a protein-only food never needs a caffeine placeholder. Configure the Today cards in **Settings → Nutrition on Today**; **Show Sodium** is off until enabled. Hiding caffeine also hides its weekly chart; the personal tracking target remains available in Settings.
 
 Existing libraries and version-1 JSON exports continue to work. The internal `SavedDrink` type and the JSON `drinks` key retain their original names to preserve compatibility; exported files are now named **Tally Library**. Existing logged drink names and Apple Health metadata remain unchanged.
 
@@ -50,7 +52,7 @@ Tally has no custom backend, Tally account, ads, or analytics. The only app-mana
 
 Live sync propagates edits and deletions; it is not an independent backup. **Settings → Backups & Restore → Export Library Snapshot** creates a manual version-1 JSON snapshot. Choose iCloud Drive in Files to keep a recovery copy there. Imports add missing UUIDs and keep existing templates unchanged. **Restore Snapshot as New Copies** creates fresh identities after confirmation, allowing recovery of older versions without overwriting current templates. These actions exclude consumption dates, usage counts, and Health history. See [iCloud sync and recovery](docs/ICLOUD_SYNC.md) for conflicts, account changes, and recovery steps.
 
-See [the data and architecture notes](docs/DATA_AND_ARCHITECTURE.md) for event grouping, save boundaries, and the JSON contract, and [local verification](docs/VERIFICATION.md) for the initial app checks. The [general nutrition verification](docs/ISSUE_2_VERIFICATION.md) records the theme-change checks. [iCloud verification](docs/ISSUE_1_VERIFICATION.md) records the current local tests, successful signed iPhone installation and launch, and the later [live CloudKit and iCloud Drive checks](docs/LIVE_ICLOUD_VERIFICATION.md), including their remaining device/UI limits.
+See [the data and architecture notes](docs/DATA_AND_ARCHITECTURE.md) for event grouping, save boundaries, and the JSON contract, and [local verification](docs/VERIFICATION.md) for the initial app checks. The [general nutrition verification](docs/ISSUE_2_VERIFICATION.md) records the theme-change checks. [Sodium/salt verification](docs/SODIUM_VERIFICATION.md) records this addition’s local checks and remaining manual limits. [iCloud verification](docs/ISSUE_1_VERIFICATION.md) records the current local tests, successful signed iPhone installation and launch, and the later [live CloudKit and iCloud Drive checks](docs/LIVE_ICLOUD_VERIFICATION.md), including their remaining device/UI limits.
 
 ## Development
 

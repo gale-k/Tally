@@ -13,6 +13,8 @@ struct SettingsView: View {
     @AppStorage("showSugar") private var showSugar = true
     @AppStorage("showProtein") private var showProtein = true
     @AppStorage("showCaffeine") private var showCaffeine = true
+    // Opt-in keeps the existing Today layout until sodium tracking is requested.
+    @AppStorage("showSodium") private var showSodium = false
     @State private var targetText = "400"
     @State private var requesting = false
     @State private var healthGuidance = false
@@ -35,6 +37,7 @@ struct SettingsView: View {
                 Toggle("Show Protein", isOn: $showProtein)
                 Toggle("Show Sugar", isOn: $showSugar)
                 Toggle("Show Caffeine & Trend", isOn: $showCaffeine)
+                Toggle("Show Sodium", isOn: $showSodium)
             } header: { Text("Nutrition on Today") }
             footer: { Text("Choose the summaries you want to see. All nutrition remains available in templates, Quick Add, and history details.") }
             Section {

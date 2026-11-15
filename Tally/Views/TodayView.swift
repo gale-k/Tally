@@ -12,6 +12,8 @@ struct TodayView: View {
     @AppStorage("showSugar") private var showSugar = true
     @AppStorage("showProtein") private var showProtein = true
     @AppStorage("showCaffeine") private var showCaffeine = true
+    // This preference affects presentation only; sodium is always available for entry and history.
+    @AppStorage("showSodium") private var showSodium = false
     @State private var sheet: DrinkSheet?
     let openLibrary: () -> Void
     private var target: Double { storedTarget.isFinite && storedTarget > 0 ? storedTarget : 400 }
@@ -25,13 +27,14 @@ struct TodayView: View {
                     .font(.subheadline).foregroundStyle(.primary)
                 if !health.permissionsRequested || !health.isAvailable { HealthAccessCard() }
                 // Equal-weight cards avoid treating caffeine as a required part of every diet entry.
-                if showCalories || showProtein || showSugar || showCaffeine {
+                if showCalories || showProtein || showSugar || showCaffeine || showSodium {
                     Text("Nutrition Today").font(.title2.weight(.semibold))
                     LazyVGrid(columns: columns, spacing: 12) {
                         if showCalories { SecondaryNutritionCard(nutrient: .calories, nutrition: health.today) }
                         if showProtein { SecondaryNutritionCard(nutrient: .protein, nutrition: health.today) }
                         if showSugar { SecondaryNutritionCard(nutrient: .sugar, nutrition: health.today) }
                         if showCaffeine { CaffeineSummaryCard(nutrition: health.today, target: target) }
+                        if showSodium { SecondaryNutritionCard(nutrient: .sodium, nutrition: health.today) }
                     }
                 }
                 if let error = health.queryError {
