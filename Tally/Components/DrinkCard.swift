@@ -9,7 +9,7 @@ struct DrinkCard: View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Image(systemName: drink.category.symbol).foregroundStyle(.tint)
+                    DrinkCategoryIcon(category: drink.category).foregroundStyle(.tint)
                     Spacer()
                     if drink.isFavourite { Image(systemName: "star.fill").font(.caption).foregroundStyle(.tint) }
                 }.accessibilityHidden(true)
@@ -44,7 +44,7 @@ struct DrinkRow: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
-            Image(systemName: drink.category.symbol)
+            DrinkCategoryIcon(category: drink.category)
                 .font(.title3).foregroundStyle(.tint).frame(width: 42, height: 48)
                 .background(Color.accentColor.opacity(0.09), in: RoundedRectangle(cornerRadius: 12))
                 .accessibilityHidden(true)
@@ -61,5 +61,19 @@ struct DrinkRow: View {
         .padding(.vertical, 6)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// A template vector sweet keeps Snack visually distinct from fruit and vegetable categories.
+struct DrinkCategoryIcon: View {
+    let category: DrinkCategory
+    @ScaledMetric private var size = 20
+
+    var body: some View {
+        if category == .snack {
+            Image("Snack").resizable().scaledToFit().frame(width: size, height: size)
+        } else {
+            Image(systemName: category.symbol)
+        }
     }
 }

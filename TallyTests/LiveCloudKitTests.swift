@@ -92,7 +92,7 @@ final class LiveCloudKitTests: XCTestCase {
         let b = try client("B", run: run, folder: folder)
         var draft = DrinkDraft()
         draft.name = "Synthetic cloud meal"; draft.brand = "Live verification"
-        draft.size = "1 serving"; draft.volume = "330"; draft.category = .meal; draft.servingStyle = .bottle
+        draft.size = "1 serving"; draft.amount = "330"; draft.category = .meal; draft.servingStyle = .bottle
         draft.notes = "Synthetic verification only"; draft.isFavourite = true
         draft.values[.caffeine] = "0"; draft.values[.calories] = "250"; draft.values[.carbohydrates] = "30"
         draft.values[.protein] = "12"; draft.values[.totalFat] = "4"; draft.values[.saturatedFat] = "1"; draft.values[.fibre] = "5"

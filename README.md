@@ -32,7 +32,7 @@ In Debug builds, **Settings → Development → Add Development Examples** inser
 
 ## Food and drink templates
 
-A name is the only required template field. Serving size is free text (for example, “1 bowl” or “330 ml”); liquid volume and serving style are optional. New items start with no specified style. Food categories sit alongside the existing coffee, tea, pod, and bottled-drink options.
+A name is the only required template field. Serving size is free text (for example, “1 bowl” or “330 ml”); amount and serving style are optional. **Amount** can be entered in **ml** or **g**; changing the unit keeps the entered number without converting between volume and weight. Serving styles include **Cold** separately from **Iced**. New items start with no specified style. Food categories sit alongside the existing coffee, tea, pod, and bottled-drink options.
 
 Calories, protein, sugar, and caffeine are immediately accessible in the editor. Carbohydrates, fats, and fibre are under **More Nutrition**. Cards show the known values that best describe each item, so a protein-only food never needs a caffeine placeholder. Configure the Today cards in **Settings → Nutrition on Today**. Hiding caffeine also hides its weekly chart; the personal tracking target remains available in Settings.
 

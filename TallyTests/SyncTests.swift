@@ -94,6 +94,25 @@ final class SyncTests: XCTestCase {
         try LibrarySyncStore.receive(incoming, systemFields: nil, in: context); try context.save()
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<SavedDrink>()), 1)
     }
+    /// Apply remote changes to an existing object in both directions so no stale unit survives a merge.
+    func testRemoteAmountUnitSwitchClearsPreviousMeasurement() throws {
+        let container = try store(); let context = container.mainContext
+        var draft = DrinkDraft(); draft.name = "Chocolate"; draft.amount = "45"; draft.amountUnit = .grams
+        draft.category = .snack; draft.servingStyle = .cold
+        let item = try DrinkLibrary.save(draft, in: context)
+        let row = try XCTUnwrap(LibrarySyncStore.state(for: item.id, in: context))
+        let outgoing = try XCTUnwrap(LibrarySyncStore.change(row).template)
+        XCTAssertEqual(outgoing.weightG, 45)
+        XCTAssertNil(outgoing.volumeMl)
+        XCTAssertEqual(outgoing.servingStyle, .cold)
+        for unit in [ServingAmountUnit.millilitres, .grams] {
+            let remote = SavedDrink(id: item.id, name: "Updated", volumeMl: unit == .millilitres ? 330 : nil,
+                weightG: unit == .grams ? 50 : nil, servingStyle: .cold)
+            try LibrarySyncStore.receive(change(remote, date: row.modifiedAt.addingTimeInterval(10)), systemFields: nil, in: context)
+            try context.save()
+            XCTAssertEqual(SavedDrinkRecord(item), SavedDrinkRecord(remote))
+        }
+    }
     func testNewerLocalEditAndStaleAcknowledgementStayPending() throws {
         let container = try store(); let context = container.mainContext
         let item = SavedDrink(name: "Original"); context.insert(item)

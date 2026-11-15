@@ -8,6 +8,8 @@ struct SavedDrinkRecord: Codable, Equatable, Sendable {
     var brandOrLocation: String?
     var size: String?
     var volumeMl: Double?
+    // Absent in older snapshots and sync payloads; existing ml values keep their original meaning.
+    var weightG: Double?
     var category: DrinkCategory
     var servingStyle: ServingStyle
     var nutrition: NutritionValues
@@ -18,7 +20,7 @@ struct SavedDrinkRecord: Codable, Equatable, Sendable {
 
     init(_ drink: SavedDrink) {
         id = drink.id; name = drink.name; brandOrLocation = drink.brandOrLocation; size = drink.size
-        volumeMl = drink.volumeMl; category = drink.category; servingStyle = drink.servingStyle
+        volumeMl = drink.volumeMl; weightG = drink.weightG; category = drink.category; servingStyle = drink.servingStyle
         nutrition = drink.nutrition; notes = drink.notes; isFavourite = drink.isFavourite
         createdAt = drink.createdAt; updatedAt = drink.updatedAt
     }
@@ -26,12 +28,15 @@ struct SavedDrinkRecord: Codable, Equatable, Sendable {
         // Match the editor's accepted text domain; the file-size bound already limits import resources.
         guard DrinkDraft.optionalText(name) != nil, createdAt.timeIntervalSince1970.isFinite,
               updatedAt.timeIntervalSince1970.isFinite else { throw LibraryTransferError.invalidRecord }
-        if let volumeMl, !volumeMl.isFinite || volumeMl <= 0 || volumeMl > 100_000 { throw DrinkValidationError.invalidVolume }
+        // Reject ambiguous dual measurements before import or sync can overwrite a valid template.
+        guard volumeMl == nil || weightG == nil else { throw LibraryTransferError.invalidRecord }
+        if let volumeMl, !volumeMl.isFinite || volumeMl <= 0 || volumeMl > 100_000 { throw DrinkValidationError.invalidAmount(.millilitres) }
+        if let weightG, !weightG.isFinite || weightG <= 0 || weightG > 100_000 { throw DrinkValidationError.invalidAmount(.grams) }
         try nutrition.validate()
     }
     func makeDrink() -> SavedDrink {
         SavedDrink(id: id, name: name.trimmingCharacters(in: .whitespacesAndNewlines), brandOrLocation: brandOrLocation,
-                   size: size, volumeMl: volumeMl, category: category, servingStyle: servingStyle,
+                   size: size, volumeMl: volumeMl, weightG: weightG, category: category, servingStyle: servingStyle,
                    nutrition: nutrition, notes: notes, isFavourite: isFavourite, createdAt: createdAt, updatedAt: updatedAt)
     }
 }

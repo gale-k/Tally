@@ -90,13 +90,14 @@ struct NutritionValues: Codable, Equatable, Sendable {
 }
 
 enum DrinkValidationError: LocalizedError {
-    case nameRequired, noNutrition, invalidNumber(String, Double, String), invalidVolume, invalidDate
+    case nameRequired, noNutrition, invalidNumber(String, Double, String), invalidAmount(ServingAmountUnit), invalidDate
     var errorDescription: String? {
         switch self {
         case .nameRequired: "Give your item a name."
         case .noNutrition: "Add at least one nutrition value before logging. Unknown values can stay blank."
         case let .invalidNumber(name, limit, unit): "Enter a number from 0 to \(limit.formatted()) \(unit) for \(name.lowercased())."
-        case .invalidVolume: "Enter a volume greater than 0 and no more than 100,000 ml, or leave it blank."
+        // The selected unit is retained in validation feedback for both food and drink amounts.
+        case let .invalidAmount(unit): "Enter an amount greater than 0 and no more than 100,000 \(unit.rawValue), or leave it blank."
         case .invalidDate: "Choose a valid date and time that is not in the future."
         }
     }

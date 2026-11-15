@@ -30,6 +30,56 @@ final class TallyUITests: XCTestCase {
         XCTAssertFalse(app.buttons["confirmLogDrink"].isEnabled)
     }
 
+    /// The editor must persist both units and Cold, including the stacked accessibility layout.
+    func testServingAmountUnitsAndColdPersistInEditor() {
+        verifyServingAmountEditor()
+    }
+    func testServingAmountEditorWithLargeText() {
+        verifyServingAmountEditor(["--dark-mode", "--large-text"])
+    }
+    private func verifyServingAmountEditor(_ arguments: [String] = []) {
+        let app = launch(arguments)
+        app.tabBars.buttons["Library"].tap()
+        app.buttons["addDrink"].tap()
+        let name = app.textFields["drinkName"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        name.tap(); name.typeText("Chocolate")
+        let amount = app.textFields["servingAmount"]
+        reveal(amount, in: app)
+        amount.tap(); amount.typeText("45")
+        app.buttons["amountUnit"].tap()
+        app.buttons["g"].tap()
+        XCTAssertEqual(amount.label, "Amount, grams")
+        let category = app.buttons["itemCategory"]
+        reveal(category, in: app); category.tap()
+        app.buttons["Snack"].tap()
+        let style = app.buttons["servingStyle"]
+        reveal(style, in: app); style.tap()
+        app.buttons["Cold"].tap()
+        capture("Serving-Grams-Cold" + (arguments.isEmpty ? "" : "-LargeText"), app)
+        app.buttons["saveDrink"].tap()
+        XCTAssertTrue(app.buttons["drink.Chocolate"].waitForExistence(timeout: 5))
+        capture("Snack-Sweet-Icon" + (arguments.isEmpty ? "" : "-LargeText"), app)
+        app.buttons["More actions for Chocolate"].tap()
+        app.buttons["Edit Item"].tap()
+        XCTAssertTrue(amount.waitForExistence(timeout: 5))
+        XCTAssertEqual(amount.value as? String, "45.0")
+        XCTAssertEqual(amount.label, "Amount, grams")
+        reveal(style, in: app)
+        XCTAssertTrue(style.label.contains("Cold"))
+        // Return to ml with the same number, save, and reopen to exercise clearing the grams field.
+        app.swipeDown()
+        reveal(app.buttons["amountUnit"], in: app)
+        app.buttons["amountUnit"].tap()
+        app.buttons["ml"].tap()
+        app.buttons["saveDrink"].tap()
+        app.buttons["More actions for Chocolate"].tap()
+        app.buttons["Edit Item"].tap()
+        XCTAssertTrue(amount.waitForExistence(timeout: 5))
+        XCTAssertEqual(amount.value as? String, "45.0")
+        XCTAssertEqual(amount.label, "Amount, millilitres")
+    }
+
     func testConfirmedLogSurvivesTemplateEditAndDeletion() {
         let app = launch(["--seed-library"])
         app.tabBars.buttons["Library"].tap()

@@ -22,7 +22,8 @@ enum DrinkCategory: String, Codable, CaseIterable, Identifiable, Sendable {
     var symbol: String {
         switch self {
         case .meal: "fork.knife"
-        case .snack: "carrot.fill"
+        // The shared category icon uses a wrapped sweet asset; this remains a system-symbol fallback.
+        case .snack: "birthday.cake.fill"
         case .fruitVegetables: "leaf.fill"
         case .dairyAlternatives: "refrigerator.fill"
         case .coffee: "cup.and.saucer.fill"
@@ -36,10 +37,18 @@ enum DrinkCategory: String, Codable, CaseIterable, Identifiable, Sendable {
 }
 
 enum ServingStyle: String, Codable, CaseIterable, Identifiable, Sendable {
-    case hot, iced, can, bottle, pod, other
+    // Cold is separate from iced so chilled items do not imply added ice.
+    case hot, cold, iced, can, bottle, pod, other
     var id: String { rawValue }
     // The existing raw value represents an unspecified style without changing the stored schema.
     var title: String { self == .other ? "Not specified" : rawValue.capitalized }
+}
+
+/// Units describe a serving amount; changing units does not perform a mass/volume conversion.
+enum ServingAmountUnit: String, CaseIterable, Identifiable, Sendable {
+    case millilitres = "ml", grams = "g"
+    var id: String { rawValue }
+    var title: String { self == .grams ? "grams" : "millilitres" }
 }
 
 /// The legacy model name preserves existing stores and JSON. Templates now cover foods and drinks.
@@ -51,6 +60,8 @@ final class SavedDrink {
     var brandOrLocation: String?
     var size: String?
     var volumeMl: Double?
+    // An additive optional property preserves existing liquid amounts and allows lightweight store migration.
+    var weightG: Double?
     var categoryRaw: String
     var servingStyleRaw: String
     var caffeineMg: Double?
@@ -70,7 +81,7 @@ final class SavedDrink {
     var timesLogged: Int
 
     init(id: UUID = UUID(), name: String, brandOrLocation: String? = nil, size: String? = nil,
-         volumeMl: Double? = nil, category: DrinkCategory = .other, servingStyle: ServingStyle = .other,
+         volumeMl: Double? = nil, weightG: Double? = nil, category: DrinkCategory = .other, servingStyle: ServingStyle = .other,
          nutrition: NutritionValues = .init(), notes: String? = nil, isFavourite: Bool = false,
          createdAt: Date = .now, updatedAt: Date = .now, lastLoggedAt: Date? = nil, timesLogged: Int = 0) {
         self.id = id
@@ -78,6 +89,7 @@ final class SavedDrink {
         self.brandOrLocation = brandOrLocation
         self.size = size
         self.volumeMl = volumeMl
+        self.weightG = weightG
         self.categoryRaw = category.rawValue
         self.servingStyleRaw = servingStyle.rawValue
         caffeineMg = nutrition.caffeine

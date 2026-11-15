@@ -143,7 +143,9 @@ enum LibrarySyncStore {
     }
     private static func apply(_ record: SavedDrinkRecord, to item: SavedDrink) {
         item.name = record.name; item.brandOrLocation = record.brandOrLocation; item.size = record.size
-        item.volumeMl = record.volumeMl; item.categoryRaw = record.category.rawValue; item.servingStyleRaw = record.servingStyle.rawValue
+        // Apply both optional fields so a remote unit switch clears the previous measurement locally.
+        item.volumeMl = record.volumeMl; item.weightG = record.weightG
+        item.categoryRaw = record.category.rawValue; item.servingStyleRaw = record.servingStyle.rawValue
         item.nutrition = record.nutrition; item.notes = record.notes; item.isFavourite = record.isFavourite
         item.createdAt = record.createdAt; item.updatedAt = record.updatedAt
     }

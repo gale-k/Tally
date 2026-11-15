@@ -5,7 +5,8 @@ struct DrinkDraft {
     var name = ""
     var brand = ""
     var size = ""
-    var volume = ""
+    var amount = ""
+    var amountUnit: ServingAmountUnit = .millilitres
     var category: DrinkCategory = .other
     var servingStyle: ServingStyle = .other
     var isFavourite = false
@@ -16,7 +17,9 @@ struct DrinkDraft {
     init() {}
     init(drink: SavedDrink) {
         name = drink.name; brand = drink.brandOrLocation ?? ""; size = drink.size ?? ""
-        volume = drink.volumeMl.map { String($0) } ?? ""
+        // Legacy templates have no weight and continue to open with their original ml amount.
+        amountUnit = drink.weightG == nil ? .millilitres : .grams
+        amount = (drink.weightG ?? drink.volumeMl).map { String($0) } ?? ""
         category = drink.category; servingStyle = drink.servingStyle
         isFavourite = drink.isFavourite; notes = drink.notes ?? ""
         for nutrient in drink.nutrition.knownNutrients { values[nutrient] = drink.nutrition[nutrient].map { String($0) } }
@@ -48,11 +51,12 @@ struct DrinkDraft {
         return result
     }
 
-    func validatedVolume() throws -> Double? {
-        guard let raw = Self.optionalText(volume) else { return nil }
+    // Both units share the same optional positive-amount bounds; neither changes nutrition totals.
+    func validatedAmount() throws -> Double? {
+        guard let raw = Self.optionalText(amount) else { return nil }
         let normalized = raw.replacingOccurrences(of: Locale.current.decimalSeparator ?? ".", with: ".")
         guard let value = Double(normalized), value.isFinite, value > 0, value <= 100_000 else {
-            throw DrinkValidationError.invalidVolume
+            throw DrinkValidationError.invalidAmount(amountUnit)
         }
         return value
     }
@@ -60,13 +64,15 @@ struct DrinkDraft {
     func validate(requireName: Bool = true) throws {
         if requireName && Self.optionalText(name) == nil { throw DrinkValidationError.nameRequired }
         _ = try nutrition()
-        _ = try validatedVolume()
+        _ = try validatedAmount()
     }
 
     func makeDrink() throws -> SavedDrink {
         try validate()
+        let amount = try validatedAmount()
         return SavedDrink(name: name.trimmingCharacters(in: .whitespacesAndNewlines), brandOrLocation: Self.optionalText(brand),
-                          size: Self.optionalText(size), volumeMl: try validatedVolume(), category: category,
+                          size: Self.optionalText(size), volumeMl: amountUnit == .millilitres ? amount : nil,
+                          weightG: amountUnit == .grams ? amount : nil, category: category,
                           servingStyle: servingStyle, nutrition: try nutrition(), notes: Self.optionalText(notes), isFavourite: isFavourite)
     }
 
@@ -74,7 +80,11 @@ struct DrinkDraft {
         try validate()
         drink.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         drink.brandOrLocation = Self.optionalText(brand); drink.size = Self.optionalText(size)
-        drink.volumeMl = try validatedVolume(); drink.categoryRaw = category.rawValue
+        // Clear the previous unit's field so switching units cannot leave two competing measurements.
+        let amount = try validatedAmount()
+        drink.volumeMl = amountUnit == .millilitres ? amount : nil
+        drink.weightG = amountUnit == .grams ? amount : nil
+        drink.categoryRaw = category.rawValue
         drink.servingStyleRaw = servingStyle.rawValue; drink.isFavourite = isFavourite
         drink.notes = Self.optionalText(notes); drink.nutrition = try nutrition(); drink.updatedAt = .now
     }
