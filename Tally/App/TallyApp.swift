@@ -14,9 +14,18 @@ struct TallyApp: App {
         let uiTesting = ProcessInfo.processInfo.arguments.contains("--ui-testing")
         // Hosted live checks must not open the real library, start its sync, reset preferences, or access Health.
         let usesTestData = uiTesting || ProcessInfo.processInfo.arguments.contains("--isolated-test-host")
-        if uiTesting {
+        if uiTesting && !ProcessInfo.processInfo.arguments.contains("--preserve-preferences") {
             // UI-test presentation choices must not leak into the next test; normal device preferences are untouched.
             for key in ["showCalories", "showProtein", "showSugar", "showCaffeine", "showSodium"] { UserDefaults.standard.removeObject(forKey: key) }
+            for reference in DailyIntakeReference.all {
+                UserDefaults.standard.removeObject(forKey: reference.valueKey)
+                UserDefaults.standard.removeObject(forKey: reference.enabledKey)
+            }
+            // Exercise the upgrade path with the original caffeine and visibility keys only.
+            if ProcessInfo.processInfo.arguments.contains("--legacy-daily-settings") {
+                UserDefaults.standard.set(250.0, forKey: "dailyCaffeineTarget")
+                UserDefaults.standard.set(false, forKey: "showSugar")
+            }
         }
         _health = State(initialValue: usesTestData
                         ? HealthKitManager(client: FixtureNutritionStore(populated: ProcessInfo.processInfo.arguments.contains("--populated-health")), defaults: nil)

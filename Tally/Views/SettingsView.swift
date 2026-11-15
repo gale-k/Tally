@@ -8,14 +8,12 @@ struct SettingsView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.openURL) private var openURL
     @Query private var drinks: [SavedDrink]
-    @AppStorage("dailyCaffeineTarget") private var target = 400.0
     @AppStorage("showCalories") private var showCalories = true
     @AppStorage("showSugar") private var showSugar = true
     @AppStorage("showProtein") private var showProtein = true
     @AppStorage("showCaffeine") private var showCaffeine = true
     // Opt-in keeps the existing Today layout until sodium tracking is requested.
     @AppStorage("showSodium") private var showSodium = false
-    @State private var targetText = "400"
     @State private var requesting = false
     @State private var healthGuidance = false
     @State private var importing = false
@@ -41,17 +39,9 @@ struct SettingsView: View {
             } header: { Text("Nutrition on Today") }
             footer: { Text("Choose the summaries you want to see. All nutrition remains available in templates, Quick Add, and history details.") }
             Section {
-                HStack {
-                    Text("Daily target")
-                    Spacer()
-                    TextField("400", text: $targetText).keyboardType(.decimalPad).multilineTextAlignment(.trailing)
-                        .frame(maxWidth: 105).accessibilityLabel("Daily caffeine tracking target, milligrams")
-                        .accessibilityIdentifier("dailyTarget")
-                    Text("mg").foregroundStyle(.secondary)
-                }
-                Button("Update Target") { saveTarget() }
-            } header: { Text("Caffeine Tracking") }
-            footer: { Text("Your personal tracking target is \(target.formatted()) mg. This is a tracking preference, not a medically recommended maximum.") }
+                NavigationLink("Daily Intake") { DailyIntakeSettingsView() }
+                    .accessibilityIdentifier("dailyIntakeSettings")
+            } footer: { Text("Adult references and personal targets for eight nutrients. Edit or turn off each daily comparison.") }
             Section {
                 LabeledContent("Health data", value: health.isAvailable ? "Available" : "Unavailable")
                 LabeledContent("Permissions requested", value: health.permissionsRequested ? "Yes" : "Not yet")
@@ -95,7 +85,6 @@ struct SettingsView: View {
             #endif
         }
         .navigationTitle("Settings")
-        .onAppear { targetText = target.formatted(.number.grouping(.never)) }
         .confirmationDialog("Manage Health Access", isPresented: $healthGuidance, titleVisibility: .visible) {
             Button("Review Permission Request") { Task { await requestAccess() } }
             Button("Open App Settings") { openURL(URL(string: UIApplication.openSettingsURLString)!) }
@@ -125,16 +114,6 @@ struct SettingsView: View {
             Button("Done") { importMessage = nil }
         } message: { Text(importMessage ?? "") }
         .errorAlert($error)
-    }
-    private func saveTarget() {
-        do {
-            guard let value = try DrinkDraft.parse(targetText, nutrient: .caffeine), value >= 1 else {
-                error = "Choose a personal tracking target from 1 to 10,000 mg."; return
-            }
-            target = value
-            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-        } catch { self.error = error.localizedDescription }
     }
     @MainActor private func requestAccess() async {
         guard !requesting else { return }

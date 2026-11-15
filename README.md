@@ -8,6 +8,7 @@ A native iPhone nutrition utility for saving your usual foods and drinks and log
 - Find a saved item with search, category filters, five sort orders, and ranked Quick Log cards.
 - Review an item and its time before logging, or use Quick Add for a one-off entry.
 - Choose calorie, protein, sugar, caffeine, and sodium summaries on Today, with recent Health history and an optional seven-day caffeine chart.
+- Compare eight daily nutrient totals with editable adult references or personal targets, with a full Daily Intake breakdown.
 - Optionally sync saved templates through your private iCloud storage, with offline edits and explicit account-switch control.
 - Export independent JSON snapshots to Files/iCloud Drive; import missing items or restore older snapshots as new copies.
 
@@ -46,11 +47,17 @@ Reusable food and drink templates remain available in this device’s SwiftData 
 
 Today’s totals and history show **visible Apple Health nutrition from all sources**, including other apps and foods. They are not presented as drinks-only totals. Empty results cannot establish whether read permission was denied. Limited-history access is respected. Pull to refresh, or return to Tally after changing data or permissions in Health.
 
-The default 400 mg caffeine target is a personal tracking preference, not a medical recommendation. Change it in Settings.
+Configure **Settings → Daily Intake** to edit, disable, or individually reset the UK Adult Reference Preset. Today shows the selected comparison, percentage, and difference; **Daily Intake Breakdown** includes all eight comparisons even when dashboard cards are hidden. Percentages continue beyond 100%. Protein and fibre do not become upper limits. Missing Health data never becomes a zero or a full remaining allowance, and estimated amounts retain `~`. Differences use visible totals only.
+
+The starting values are 2,000 kcal, 50 g protein, 260 g carbohydrates, 70 g total fat, 20 g saturated fat, and 90 g **total sugars** ([NHS Scotland adult food-label references](https://mydiabetesmyway.scot.nhs.uk/resources/internal/food-labels/#reference-intakes)); 30 g fibre ([Food Standards Scotland](https://www.foodstandards.gov.scot/consumer-advice/healthy-eating/balanced-diet/understanding-nutrients/fibre)); and a 400 mg personal caffeine target ([EFSA healthy-adult guidance](https://www.efsa.europa.eu/en/topics/topic/caffeine)). These are general adult starting points; individual needs vary. Food-label references are not universal targets or safe maximums. Caffeine guidance differs for pregnancy and breastfeeding; your existing personal caffeine target is preserved. Edited values are labelled personal targets.
+
+Tally's total sugars cannot distinguish free sugars, so it is not compared against the [NHS 30 g free-sugars guidance](https://www.nhs.uk/live-well/eat-well/food-types/how-does-sugar-in-our-diet-affect-our-health/). Daily settings stay local, are excluded from snapshots/sync, and never change saved nutrition, Health permissions, or history. Sodium retains its optional summary without gaining a daily preset in this feature.
 
 Tally has no custom backend, Tally account, ads, or analytics. The only app-managed network transfer is optional template sync through Apple CloudKit. Preferences, convenience usage counts/dates, and Health permission state stay local. Apple Health’s own system-managed sync and backup settings are controlled separately by the user.
 
 Live sync propagates edits and deletions; it is not an independent backup. **Settings → Backups & Restore → Export Library Snapshot** creates a manual version-1 JSON snapshot. Choose iCloud Drive in Files to keep a recovery copy there. Imports add missing UUIDs and keep existing templates unchanged. **Restore Snapshot as New Copies** creates fresh identities after confirmation, allowing recovery of older versions without overwriting current templates. These actions exclude consumption dates, usage counts, and Health history. See [iCloud sync and recovery](docs/ICLOUD_SYNC.md) for conflicts, account changes, and recovery steps.
+
+The [daily intake verification](docs/DAILY_INTAKE_VERIFICATION.md) records the target-setting, compatibility, appearance, local test, and physical-device checks.
 
 See [the data and architecture notes](docs/DATA_AND_ARCHITECTURE.md) for event grouping, save boundaries, and the JSON contract, and [local verification](docs/VERIFICATION.md) for the initial app checks. The [general nutrition verification](docs/ISSUE_2_VERIFICATION.md) records the theme-change checks. [Sodium/salt verification](docs/SODIUM_VERIFICATION.md) records this addition’s local checks and remaining manual limits. [iCloud verification](docs/ISSUE_1_VERIFICATION.md) records the current local tests, successful signed iPhone installation and launch, and the later [live CloudKit and iCloud Drive checks](docs/LIVE_ICLOUD_VERIFICATION.md), including their remaining device/UI limits.
 

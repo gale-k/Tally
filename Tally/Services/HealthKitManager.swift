@@ -7,6 +7,7 @@ final class HealthKitManager {
     private let client: any NutritionStore
     private let defaults: UserDefaults?
     private var refreshID = UUID()
+    private var todayWindow: DateInterval?
     private(set) var permissionsRequested: Bool
     private(set) var isLoading = false
     private(set) var isSaving = false
@@ -51,6 +52,9 @@ final class HealthKitManager {
 
     func refresh(now: Date = .now) async {
         guard isAvailable, permissionsRequested else { return }
+        let window = DateWindows.day(containing: now)
+        // Never compare yesterday's total with today's target if the new day's query fails.
+        if todayWindow != window { today = NutritionValues(); todayWindow = window }
         let token = UUID()
         refreshID = token
         isLoading = true
@@ -60,7 +64,7 @@ final class HealthKitManager {
             let limits = try await client.limitedReadDates()
             let grouped = try HealthAggregation.events(records, ownBundle: client.ownBundleIdentifier)
             let history = try HealthAggregation.historyDays(records, events: grouped)
-            let daily = try HealthAggregation.totals(records.filter { DateWindows.contains($0.date, in: DateWindows.day(containing: now)) })
+            let daily = try HealthAggregation.totals(records.filter { DateWindows.contains($0.date, in: window) })
             let trend = try HealthAggregation.caffeineDays(records, count: 7, now: now)
             // A stale foreground refresh must not overwrite a newer post-save response.
             guard refreshID == token else { return }

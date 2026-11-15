@@ -14,6 +14,10 @@ struct RootView: View {
             Tab("Settings", systemImage: "gearshape", value: 3) { NavigationStack { SettingsView() } }
         }
         .task { await health.refresh(); await sync.startIfNeeded() }
+        // iOS posts this at midnight and after clock/time-zone changes, including while foregrounded.
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
+            Task { await health.refresh() }
+        }
         .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await health.refresh(); await sync.refreshAccount() } } }
     }
 }

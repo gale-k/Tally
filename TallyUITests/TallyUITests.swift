@@ -414,6 +414,120 @@ final class TallyUITests: XCTestCase {
         capture("Backups-Dark-Accessibility3", app)
     }
 
+    /// Exercise real Settings bindings, validation, relaunch persistence, disable, reset, and Today updates.
+    func testDailyIntakeSettingsPersistAndUpdateToday() {
+        let app = launch(["--seed-library", "--populated-health"])
+        connectFixture(app)
+        app.tabBars.buttons["Settings"].tap()
+        app.buttons["dailyIntakeSettings"].tap()
+        app.buttons["dailyIntake.calories"].tap()
+        let field = app.textFields["dailyIntakeValue"]
+        replace(field, with: "300")
+        app.buttons["saveDailyIntake"].tap()
+        XCTAssertTrue(app.staticTexts["Value saved"].waitForExistence(timeout: 5))
+        app.tabBars.buttons["Today"].tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "200%")).firstMatch.waitForExistence(timeout: 5))
+        capture("Daily-Intake-Above-Target", app)
+        app.tabBars.buttons["Settings"].tap()
+        replace(field, with: "0")
+        app.buttons["saveDailyIntake"].tap()
+        XCTAssertTrue(app.staticTexts["dailyIntakeError"].waitForExistence(timeout: 5))
+        capture("Daily-Intake-Invalid-Value", app)
+        app.swipeDown()
+        let enabled = app.switches["comparisonEnabled"]
+        reveal(enabled, in: app)
+        enabled.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+        app.terminate()
+        app.launchArguments += ["--preserve-preferences"]
+        app.launch()
+        connectFixture(app)
+        XCTAssertTrue(app.staticTexts["Comparison off"].exists)
+        app.tabBars.buttons["Settings"].tap()
+        app.buttons["dailyIntakeSettings"].tap(); app.buttons["dailyIntake.calories"].tap()
+        XCTAssertEqual(field.value as? String, "300")
+        XCTAssertEqual(enabled.value as? String, "0")
+        app.buttons["resetDailyIntake"].tap()
+        XCTAssertEqual(enabled.value as? String, "1")
+        XCTAssertEqual(field.value as? String, "2000")
+        app.tabBars.buttons["Today"].tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "30%")).firstMatch.waitForExistence(timeout: 5))
+        app.tabBars.buttons["Library"].tap()
+        XCTAssertTrue(app.buttons["drink.Iced Mocha"].label.contains("~100 mg caffeine"))
+    }
+
+    /// The upgrade retains both the original caffeine amount and existing dashboard visibility choices.
+    func testDailyIntakePreservesLegacyCaffeineAndVisibility() {
+        let app = launch(["--legacy-daily-settings", "--populated-health"])
+        connectFixture(app)
+        XCTAssertFalse(app.staticTexts["today.sugar"].exists)
+        app.tabBars.buttons["Settings"].tap()
+        XCTAssertEqual(app.switches["Show Sugar"].value as? String, "0")
+        app.buttons["dailyIntakeSettings"].tap()
+        app.buttons["dailyIntake.caffeine"].tap()
+        let field = app.textFields["dailyIntakeValue"]
+        XCTAssertEqual(field.value as? String, "250")
+        replace(field, with: "225"); app.buttons["saveDailyIntake"].tap()
+        app.tabBars.buttons["Today"].tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "100%")).firstMatch.waitForExistence(timeout: 5))
+        app.tabBars.buttons["Settings"].tap()
+        replace(field, with: "100"); app.buttons["saveDailyIntake"].tap()
+        app.tabBars.buttons["Today"].tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "225%")).firstMatch.waitForExistence(timeout: 5))
+        reveal(app.buttons["dailyIntakeBreakdown"], in: app); app.buttons["dailyIntakeBreakdown"].tap()
+        XCTAssertTrue(app.staticTexts["Total Sugars"].exists)
+        capture("Daily-Intake-Breakdown", app)
+    }
+
+    /// A visible zero is measured data and must show 0% rather than the unknown-data state.
+    func testDailyIntakeKnownZeroStillCompares() {
+        let app = launch()
+        app.tabBars.buttons["Library"].tap(); app.buttons["Quick Add"].tap()
+        let calories = app.textFields["nutrition.calories"]
+        reveal(calories, in: app); calories.tap(); calories.typeText("0")
+        let log = app.buttons["quickLogToHealth"]
+        reveal(log, in: app); log.tap()
+        XCTAssertTrue(log.waitForNonExistence(timeout: 10))
+        app.tabBars.buttons["Today"].tap()
+        XCTAssertTrue(app.staticTexts["today.calories"].label.contains("0 kcal"))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "0%")).firstMatch.waitForExistence(timeout: 5))
+        capture("Daily-Intake-Known-Zero", app)
+    }
+
+    /// Empty and failed Health queries cannot manufacture a zero or full remaining allowance.
+    func testDailyIntakeUnknownAndFailedHealthData() {
+        let app = launch(["--query-failure"])
+        app.buttons["chooseHealthAccess"].tap()
+        XCTAssertTrue(app.staticTexts["Health refresh needs attention"].waitForExistence(timeout: 5))
+        reveal(app.buttons["dailyIntakeBreakdown"], in: app); app.buttons["dailyIntakeBreakdown"].tap()
+        XCTAssertTrue(app.staticTexts["Health refresh needs attention"].exists)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "No visible data to compare")).firstMatch.exists)
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "%")).firstMatch.exists)
+        capture("Daily-Intake-Unknown-Health", app)
+    }
+
+    /// Verify the new destinations at accessibility text sizes, with all nutrient settings discoverable.
+    func testDailyIntakeDarkLargeTextAndAccessibility() throws {
+        let app = launch(["--dark-mode", "--large-text", "--populated-health"])
+        connectFixture(app)
+        reveal(app.buttons["dailyIntakeBreakdown"], in: app); app.buttons["dailyIntakeBreakdown"].tap()
+        try app.performAccessibilityAudit(for: [.sufficientElementDescription])
+        XCTAssertTrue(app.navigationBars["Daily Intake"].waitForExistence(timeout: 5))
+        capture("Daily-Intake-Dark-LargeText", app)
+        let progress = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "to reference")).firstMatch
+        reveal(progress, in: app)
+        app.swipeUp()
+        capture("Daily-Intake-Card-Dark-LargeText", app)
+        app.tabBars.buttons["Settings"].tap()
+        reveal(app.buttons["dailyIntakeSettings"], in: app); app.buttons["dailyIntakeSettings"].tap()
+        capture("Daily-Intake-Settings-Dark-LargeText", app)
+        for nutrient in ["calories", "protein", "sugar", "caffeine", "carbohydrates", "totalFat", "saturatedFat", "fibre"] {
+            reveal(app.buttons["dailyIntake." + nutrient], in: app)
+        }
+        app.buttons["dailyIntake.fibre"].tap()
+        capture("Daily-Intake-Editor-Dark-LargeText", app)
+        try app.performAccessibilityAudit(for: [.sufficientElementDescription])
+    }
+
     // SwiftUI may call a partially exposed row hittable even when its centre is behind the keyboard.
     // Reveal its actual tap point, including deeper extended nutrition and targets above the current scroll position.
     private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
@@ -455,7 +569,7 @@ final class TallyUITests: XCTestCase {
         // Decimal-pad Command-A is unreliable in this Simulator. Tap at the trailing edge to place the caret after the value.
         field.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.5)).tap()
         field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count))
-        XCTAssertTrue(["", "Optional"].contains(field.value as? String ?? ""))
+        XCTAssertTrue(["", field.placeholderValue ?? "Optional"].contains(field.value as? String ?? ""), "Field did not clear: \(field.value as? String ?? "")")
         field.typeText(value)
         XCTAssertEqual(field.value as? String, value)
     }

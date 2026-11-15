@@ -7,7 +7,6 @@ struct TodayView: View {
     @Environment(HealthKitManager.self) private var health
     @Environment(\.dynamicTypeSize) private var typeSize
     @Query private var drinks: [SavedDrink]
-    @AppStorage("dailyCaffeineTarget") private var storedTarget = 400.0
     @AppStorage("showCalories") private var showCalories = true
     @AppStorage("showSugar") private var showSugar = true
     @AppStorage("showProtein") private var showProtein = true
@@ -16,7 +15,6 @@ struct TodayView: View {
     @AppStorage("showSodium") private var showSodium = false
     @State private var sheet: DrinkSheet?
     let openLibrary: () -> Void
-    private var target: Double { storedTarget.isFinite && storedTarget > 0 ? storedTarget : 400 }
     private var columns: [GridItem] { [GridItem(.adaptive(minimum: typeSize.isAccessibilitySize ? 280 : 155), spacing: 12)] }
 
     var body: some View {
@@ -33,10 +31,15 @@ struct TodayView: View {
                         if showCalories { SecondaryNutritionCard(nutrient: .calories, nutrition: health.today) }
                         if showProtein { SecondaryNutritionCard(nutrient: .protein, nutrition: health.today) }
                         if showSugar { SecondaryNutritionCard(nutrient: .sugar, nutrition: health.today) }
-                        if showCaffeine { CaffeineSummaryCard(nutrition: health.today, target: target) }
+                        if showCaffeine { CaffeineSummaryCard(nutrition: health.today) }
                         if showSodium { SecondaryNutritionCard(nutrient: .sodium, nutrition: health.today) }
                     }
                 }
+                // The breakdown remains accessible even when every dashboard card is hidden.
+                NavigationLink {
+                    DailyIntakeBreakdownView()
+                } label: { Label("Daily Intake Breakdown", systemImage: "chart.bar.xaxis") }
+                    .accessibilityIdentifier("dailyIntakeBreakdown")
                 if let error = health.queryError {
                     VStack(alignment: .leading, spacing: 8) {
                         Label("Health refresh needs attention", systemImage: "exclamationmark.circle").font(.headline)
