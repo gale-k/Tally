@@ -82,7 +82,7 @@ final class SyncTests: XCTestCase {
         context.insert(item); try LibrarySyncStore.stage(item, in: context, now: Date(timeIntervalSince1970: 10)); try context.save()
         let remote = SavedDrink(id: item.id, name: "Updated", brandOrLocation: "Example", size: "One serving", volumeMl: 330,
                                 category: .meal, servingStyle: .bottle,
-                                nutrition: .init(caffeine: 110, sugar: 12, carbohydrates: 20, protein: 0, totalFat: 3, saturatedFat: 1, fibre: 2, estimated: [.caffeine, .sugar]),
+                                nutrition: .init(caffeine: 110, sugar: 12, carbohydrates: 20, protein: 0, totalFat: 3, saturatedFat: 1, fibre: 2, sodium: 500, estimated: [.caffeine, .sugar, .sodium]),
                                 notes: "Serving notes", isFavourite: true)
         let incoming = change(remote, date: Date(timeIntervalSince1970: 20))
         try LibrarySyncStore.receive(incoming, systemFields: nil, in: context); try context.save()
@@ -93,6 +93,25 @@ final class SyncTests: XCTestCase {
         XCTAssertFalse(try XCTUnwrap(LibrarySyncStore.state(for: item.id, in: context)).needsUpload)
         try LibrarySyncStore.receive(incoming, systemFields: nil, in: context); try context.save()
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<SavedDrink>()), 1)
+    }
+    /// Apply remote changes to an existing object in both directions so no stale unit survives a merge.
+    func testRemoteAmountUnitSwitchClearsPreviousMeasurement() throws {
+        let container = try store(); let context = container.mainContext
+        var draft = DrinkDraft(); draft.name = "Chocolate"; draft.amount = "45"; draft.amountUnit = .grams
+        draft.category = .snack; draft.servingStyle = .cold
+        let item = try DrinkLibrary.save(draft, in: context)
+        let row = try XCTUnwrap(LibrarySyncStore.state(for: item.id, in: context))
+        let outgoing = try XCTUnwrap(LibrarySyncStore.change(row).template)
+        XCTAssertEqual(outgoing.weightG, 45)
+        XCTAssertNil(outgoing.volumeMl)
+        XCTAssertEqual(outgoing.servingStyle, .cold)
+        for unit in [ServingAmountUnit.millilitres, .grams] {
+            let remote = SavedDrink(id: item.id, name: "Updated", volumeMl: unit == .millilitres ? 330 : nil,
+                weightG: unit == .grams ? 50 : nil, servingStyle: .cold)
+            try LibrarySyncStore.receive(change(remote, date: row.modifiedAt.addingTimeInterval(10)), systemFields: nil, in: context)
+            try context.save()
+            XCTAssertEqual(SavedDrinkRecord(item), SavedDrinkRecord(remote))
+        }
     }
     func testNewerLocalEditAndStaleAcknowledgementStayPending() throws {
         let container = try store(); let context = container.mainContext
@@ -272,6 +291,34 @@ final class SyncTests: XCTestCase {
             XCTAssertEqual(try context.fetchCount(FetchDescriptor<SavedDrink>()), 1)
             XCTAssertNil(manager.engine)
         }
+    }
+
+    func testCustomVerificationZoneCannotDecodeOrReuseProductionRecords() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("TallyZoneCodec-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let item = SavedDrink(name: "Synthetic")
+        let value = change(item, date: .now)
+        let zone = CKRecordZone.ID(zoneName: "TallyCloudVerification-" + UUID().uuidString)
+        let record = try CloudTemplateCodec.record(for: value, systemFields: nil, assetDirectory: folder, zoneID: zone)
+        XCTAssertEqual(record.recordID.zoneID, zone)
+        XCTAssertEqual(try CloudTemplateCodec.change(from: record, zoneID: zone), value)
+        XCTAssertThrowsError(try CloudTemplateCodec.change(from: record))
+        XCTAssertThrowsError(try CloudTemplateCodec.acknowledgedRevision(from: record))
+        XCTAssertThrowsError(try CloudTemplateCodec.record(for: value, systemFields: CloudTemplateCodec.systemFields(record), assetDirectory: folder))
+    }
+
+    func testOnlyCompleteRecordConflictsAreTreatedAsResolvedRetries() throws {
+        let record = CKRecord(recordType: CloudTemplateCodec.recordType)
+        let conflict = CKError(.serverRecordChanged, userInfo: [CKRecordChangedErrorServerRecordKey: record])
+        XCTAssertTrue(CloudSyncFailure.isRecordConflict(conflict))
+        let partial = CKError(.partialFailure, userInfo: [CKPartialErrorsByItemIDKey: ["item": conflict]])
+        XCTAssertTrue(CloudSyncFailure.isRecordConflict(partial))
+        let mixed = CKError(.partialFailure, userInfo: [CKPartialErrorsByItemIDKey: ["conflict": conflict, "quota": CKError(.quotaExceeded)]])
+        XCTAssertFalse(CloudSyncFailure.isRecordConflict(mixed))
+        XCTAssertFalse(CloudSyncFailure.isRecordConflict(CKError(.partialFailure)))
+        XCTAssertFalse(CloudSyncFailure.isRecordConflict(CKError(.serverRecordChanged)))
+        XCTAssertFalse(CloudSyncFailure.isRecordConflict(CKError(.notAuthenticated)))
+        XCTAssertFalse(CloudSyncFailure.isRecordConflict(CKError(.networkFailure)))
     }
 
     func testSnapshotDecodePerformance() throws {

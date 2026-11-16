@@ -1,6 +1,6 @@
 # iCloud library verification — issue #1
 
-Initial verification ran locally on Kai’s Mac on 13 November 2026, using Xcode 27.0 (27A266a), the installed iOS 27 SDK, and the unchanged iOS 27 deployment target. The 14 November follow-up below records successful signed installation and launch on the physical iPhone. No GitHub-hosted Actions were triggered or used.
+Initial verification ran locally on Kai’s Mac on 13 November 2026, using Xcode 27.0 (27A266a), the installed iOS 27 SDK, and the unchanged iOS 27 deployment target. The 14 November follow-up below records successful signed installation and launch on the physical iPhone. No GitHub-hosted Actions were triggered or used. Later [live CloudKit and iCloud Drive verification](LIVE_ICLOUD_VERIFICATION.md) records the live-discovered fixes, passing checks, and remaining two-phone/UI limits.
 
 ## Implementation and scope
 

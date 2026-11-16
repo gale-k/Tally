@@ -17,7 +17,9 @@ struct LogDrinkSheet: View {
             Section {
                 VStack(alignment: .leading, spacing: 8) {
                     if let brand = drink.brandOrLocation { Text(brand).font(.subheadline).foregroundStyle(.secondary) }
-                    Label(drink.name, systemImage: drink.category.symbol).font(.title2.weight(.semibold))
+                    // Use the same category artwork as Library rows and Quick Log cards.
+                    Label { Text(drink.name) } icon: { DrinkCategoryIcon(category: drink.category) }
+                        .font(.title2.weight(.semibold))
                     if let size = drink.size { Text(size).foregroundStyle(.secondary) }
                 }.padding(.vertical, 8)
             }

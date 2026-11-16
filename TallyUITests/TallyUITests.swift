@@ -30,6 +30,56 @@ final class TallyUITests: XCTestCase {
         XCTAssertFalse(app.buttons["confirmLogDrink"].isEnabled)
     }
 
+    /// The editor must persist both units and Cold, including the stacked accessibility layout.
+    func testServingAmountUnitsAndColdPersistInEditor() {
+        verifyServingAmountEditor()
+    }
+    func testServingAmountEditorWithLargeText() {
+        verifyServingAmountEditor(["--dark-mode", "--large-text"])
+    }
+    private func verifyServingAmountEditor(_ arguments: [String] = []) {
+        let app = launch(arguments)
+        app.tabBars.buttons["Library"].tap()
+        app.buttons["addDrink"].tap()
+        let name = app.textFields["drinkName"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        name.tap(); name.typeText("Chocolate")
+        let amount = app.textFields["servingAmount"]
+        reveal(amount, in: app)
+        amount.tap(); amount.typeText("45")
+        app.buttons["amountUnit"].tap()
+        app.buttons["g"].tap()
+        XCTAssertEqual(amount.label, "Amount, grams")
+        let category = app.buttons["itemCategory"]
+        reveal(category, in: app); category.tap()
+        app.buttons["Snack"].tap()
+        let style = app.buttons["servingStyle"]
+        reveal(style, in: app); style.tap()
+        app.buttons["Cold"].tap()
+        capture("Serving-Grams-Cold" + (arguments.isEmpty ? "" : "-LargeText"), app)
+        app.buttons["saveDrink"].tap()
+        XCTAssertTrue(app.buttons["drink.Chocolate"].waitForExistence(timeout: 5))
+        capture("Snack-Sweet-Icon" + (arguments.isEmpty ? "" : "-LargeText"), app)
+        app.buttons["More actions for Chocolate"].tap()
+        app.buttons["Edit Item"].tap()
+        XCTAssertTrue(amount.waitForExistence(timeout: 5))
+        XCTAssertEqual(amount.value as? String, "45.0")
+        XCTAssertEqual(amount.label, "Amount, grams")
+        reveal(style, in: app)
+        XCTAssertTrue(style.label.contains("Cold"))
+        // Return to ml with the same number, save, and reopen to exercise clearing the grams field.
+        app.swipeDown()
+        reveal(app.buttons["amountUnit"], in: app)
+        app.buttons["amountUnit"].tap()
+        app.buttons["ml"].tap()
+        app.buttons["saveDrink"].tap()
+        app.buttons["More actions for Chocolate"].tap()
+        app.buttons["Edit Item"].tap()
+        XCTAssertTrue(amount.waitForExistence(timeout: 5))
+        XCTAssertEqual(amount.value as? String, "45.0")
+        XCTAssertEqual(amount.label, "Amount, millilitres")
+    }
+
     func testConfirmedLogSurvivesTemplateEditAndDeletion() {
         let app = launch(["--seed-library"])
         app.tabBars.buttons["Library"].tap()
@@ -207,6 +257,82 @@ final class TallyUITests: XCTestCase {
         capture("Food-History-Detail", app)
     }
 
+    /// Salt is an alternate input for one sodium value, retained through editing and historical logging.
+    func testSodiumAndSaltCanBeSavedConvertedAndLogged() {
+        verifySodiumAndSaltEditor()
+    }
+    func testSodiumAndSaltWithLargeText() {
+        verifySodiumAndSaltEditor(["--dark-mode", "--large-text"])
+    }
+    private func verifySodiumAndSaltEditor(_ arguments: [String] = []) {
+        let app = launch(arguments)
+        let suffix = arguments.isEmpty ? "" : "-LargeText"
+        app.tabBars.buttons["Library"].tap()
+        app.buttons["addDrink"].tap()
+        let name = app.textFields["drinkName"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        name.tap(); name.typeText("Salty Soup")
+        let more = app.buttons["More Nutrition"]
+        reveal(more, in: app); more.tap()
+        let unit = app.buttons["sodiumInputUnit"]
+        reveal(unit, in: app); unit.tap()
+        app.buttons["Salt (g)"].tap()
+        let sodium = app.textFields["nutrition.sodium"]
+        reveal(sodium, in: app)
+        XCTAssertEqual(sodium.label, "Salt, g")
+        sodium.tap(); sodium.typeText("1.25")
+        app.buttons["estimate.sodium"].tap()
+        capture("Salt-Input" + suffix, app)
+        reveal(unit, in: app); unit.tap(); app.buttons["Sodium (mg)"].tap()
+        XCTAssertEqual(sodium.value as? String, "500")
+        XCTAssertEqual(sodium.label, "Sodium, mg")
+        app.buttons["saveDrink"].tap()
+        let item = app.buttons["drink.Salty Soup"]
+        XCTAssertTrue(item.waitForExistence(timeout: 5))
+        XCTAssertTrue(item.label.contains("~500 mg sodium"))
+        app.buttons["More actions for Salty Soup"].tap(); app.buttons["Edit Item"].tap()
+        reveal(more, in: app); more.tap()
+        reveal(sodium, in: app)
+        XCTAssertEqual(sodium.value as? String, "500.0")
+        XCTAssertEqual(app.buttons["estimate.sodium"].value as? String, "Estimated")
+        reveal(unit, in: app); unit.tap(); app.buttons["Salt (g)"].tap()
+        XCTAssertEqual(sodium.value as? String, "1.25")
+        app.buttons["saveDrink"].tap()
+        XCTAssertTrue(item.waitForExistence(timeout: 5)); item.tap()
+        XCTAssertTrue(app.buttons["confirmLogDrink"].waitForExistence(timeout: 5))
+        app.buttons["confirmLogDrink"].tap()
+        XCTAssertTrue(app.buttons["confirmLogDrink"].waitForNonExistence(timeout: 10))
+        app.tabBars.buttons["History"].tap()
+        let event = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "~500 mg sodium")).firstMatch
+        XCTAssertTrue(event.waitForExistence(timeout: 5)); event.tap()
+        XCTAssertTrue(app.staticTexts["Sodium"].exists)
+        capture("Sodium-History" + suffix, app)
+    }
+
+    /// Explicit zero from Quick Add remains visible, even when sodium is the only selected Today card.
+    func testQuickAddSodiumCanAppearOnToday() {
+        let app = launch()
+        app.tabBars.buttons["Settings"].tap()
+        for title in ["Show Calories", "Show Protein", "Show Sugar", "Show Caffeine & Trend", "Show Sodium"] {
+            let toggle = app.switches[title]
+            toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+        }
+        app.tabBars.buttons["Library"].tap(); app.buttons["Quick Add"].tap()
+        let more = app.buttons["More Nutrition"]
+        reveal(more, in: app); more.tap()
+        let sodium = app.textFields["nutrition.sodium"]
+        reveal(sodium, in: app); sodium.tap(); sodium.typeText("0")
+        let log = app.buttons["quickLogToHealth"]
+        reveal(log, in: app); log.tap()
+        XCTAssertTrue(log.waitForNonExistence(timeout: 10))
+        app.tabBars.buttons["Today"].tap()
+        XCTAssertTrue(app.staticTexts["Nutrition Today"].exists)
+        XCTAssertTrue(app.staticTexts["Sodium"].exists)
+        XCTAssertTrue(app.staticTexts["0 mg"].exists)
+        XCTAssertFalse(app.staticTexts["todayCaffeine"].exists)
+        capture("Sodium-Only-Today", app)
+    }
+
     /// Hiding caffeine is a presentation choice; caffeine-only templates remain usable in the same library.
     func testTodayNutrientsCanBeConfiguredWithoutChangingTemplates() {
         let app = launch(["--seed-library", "--populated-health"])
@@ -288,13 +414,131 @@ final class TallyUITests: XCTestCase {
         capture("Backups-Dark-Accessibility3", app)
     }
 
-    // SwiftUI Forms lazily expose off-screen fields. Scroll until the actual target is visible, including after keyboard dismissal.
+    /// Exercise real Settings bindings, validation, relaunch persistence, disable, reset, and Today updates.
+    func testDailyIntakeSettingsPersistAndUpdateToday() {
+        let app = launch(["--seed-library", "--populated-health"])
+        connectFixture(app)
+        app.tabBars.buttons["Settings"].tap()
+        app.buttons["dailyIntakeSettings"].tap()
+        app.buttons["dailyIntake.calories"].tap()
+        let field = app.textFields["dailyIntakeValue"]
+        replace(field, with: "300")
+        app.buttons["saveDailyIntake"].tap()
+        XCTAssertTrue(app.staticTexts["Value saved"].waitForExistence(timeout: 5))
+        app.tabBars.buttons["Today"].tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "200%")).firstMatch.waitForExistence(timeout: 5))
+        capture("Daily-Intake-Above-Target", app)
+        app.tabBars.buttons["Settings"].tap()
+        replace(field, with: "0")
+        app.buttons["saveDailyIntake"].tap()
+        XCTAssertTrue(app.staticTexts["dailyIntakeError"].waitForExistence(timeout: 5))
+        capture("Daily-Intake-Invalid-Value", app)
+        app.swipeDown()
+        let enabled = app.switches["comparisonEnabled"]
+        reveal(enabled, in: app)
+        enabled.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+        app.terminate()
+        app.launchArguments += ["--preserve-preferences"]
+        app.launch()
+        connectFixture(app)
+        XCTAssertTrue(app.staticTexts["Comparison off"].exists)
+        app.tabBars.buttons["Settings"].tap()
+        app.buttons["dailyIntakeSettings"].tap(); app.buttons["dailyIntake.calories"].tap()
+        XCTAssertEqual(field.value as? String, "300")
+        XCTAssertEqual(enabled.value as? String, "0")
+        app.buttons["resetDailyIntake"].tap()
+        XCTAssertEqual(enabled.value as? String, "1")
+        XCTAssertEqual(field.value as? String, "2000")
+        app.tabBars.buttons["Today"].tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "30%")).firstMatch.waitForExistence(timeout: 5))
+        app.tabBars.buttons["Library"].tap()
+        XCTAssertTrue(app.buttons["drink.Iced Mocha"].label.contains("~100 mg caffeine"))
+    }
+
+    /// The upgrade retains both the original caffeine amount and existing dashboard visibility choices.
+    func testDailyIntakePreservesLegacyCaffeineAndVisibility() {
+        let app = launch(["--legacy-daily-settings", "--populated-health"])
+        connectFixture(app)
+        XCTAssertFalse(app.staticTexts["today.sugar"].exists)
+        app.tabBars.buttons["Settings"].tap()
+        XCTAssertEqual(app.switches["Show Sugar"].value as? String, "0")
+        app.buttons["dailyIntakeSettings"].tap()
+        app.buttons["dailyIntake.caffeine"].tap()
+        let field = app.textFields["dailyIntakeValue"]
+        XCTAssertEqual(field.value as? String, "250")
+        replace(field, with: "225"); app.buttons["saveDailyIntake"].tap()
+        app.tabBars.buttons["Today"].tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "100%")).firstMatch.waitForExistence(timeout: 5))
+        app.tabBars.buttons["Settings"].tap()
+        replace(field, with: "100"); app.buttons["saveDailyIntake"].tap()
+        app.tabBars.buttons["Today"].tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "225%")).firstMatch.waitForExistence(timeout: 5))
+        reveal(app.buttons["dailyIntakeBreakdown"], in: app); app.buttons["dailyIntakeBreakdown"].tap()
+        XCTAssertTrue(app.staticTexts["Total Sugars"].exists)
+        capture("Daily-Intake-Breakdown", app)
+    }
+
+    /// A visible zero is measured data and must show 0% rather than the unknown-data state.
+    func testDailyIntakeKnownZeroStillCompares() {
+        let app = launch()
+        app.tabBars.buttons["Library"].tap(); app.buttons["Quick Add"].tap()
+        let calories = app.textFields["nutrition.calories"]
+        reveal(calories, in: app); calories.tap(); calories.typeText("0")
+        let log = app.buttons["quickLogToHealth"]
+        reveal(log, in: app); log.tap()
+        XCTAssertTrue(log.waitForNonExistence(timeout: 10))
+        app.tabBars.buttons["Today"].tap()
+        XCTAssertTrue(app.staticTexts["today.calories"].label.contains("0 kcal"))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "0%")).firstMatch.waitForExistence(timeout: 5))
+        capture("Daily-Intake-Known-Zero", app)
+    }
+
+    /// Empty and failed Health queries cannot manufacture a zero or full remaining allowance.
+    func testDailyIntakeUnknownAndFailedHealthData() {
+        let app = launch(["--query-failure"])
+        app.buttons["chooseHealthAccess"].tap()
+        XCTAssertTrue(app.staticTexts["Health refresh needs attention"].waitForExistence(timeout: 5))
+        reveal(app.buttons["dailyIntakeBreakdown"], in: app); app.buttons["dailyIntakeBreakdown"].tap()
+        XCTAssertTrue(app.staticTexts["Health refresh needs attention"].exists)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "No visible data to compare")).firstMatch.exists)
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "%")).firstMatch.exists)
+        capture("Daily-Intake-Unknown-Health", app)
+    }
+
+    /// Verify the new destinations at accessibility text sizes, with all nutrient settings discoverable.
+    func testDailyIntakeDarkLargeTextAndAccessibility() throws {
+        let app = launch(["--dark-mode", "--large-text", "--populated-health"])
+        connectFixture(app)
+        reveal(app.buttons["dailyIntakeBreakdown"], in: app); app.buttons["dailyIntakeBreakdown"].tap()
+        try app.performAccessibilityAudit(for: [.sufficientElementDescription])
+        XCTAssertTrue(app.navigationBars["Daily Intake"].waitForExistence(timeout: 5))
+        capture("Daily-Intake-Dark-LargeText", app)
+        let progress = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "to reference")).firstMatch
+        reveal(progress, in: app)
+        app.swipeUp()
+        capture("Daily-Intake-Card-Dark-LargeText", app)
+        app.tabBars.buttons["Settings"].tap()
+        reveal(app.buttons["dailyIntakeSettings"], in: app); app.buttons["dailyIntakeSettings"].tap()
+        capture("Daily-Intake-Settings-Dark-LargeText", app)
+        for nutrient in ["calories", "protein", "sugar", "caffeine", "carbohydrates", "totalFat", "saturatedFat", "fibre"] {
+            reveal(app.buttons["dailyIntake." + nutrient], in: app)
+        }
+        app.buttons["dailyIntake.fibre"].tap()
+        capture("Daily-Intake-Editor-Dark-LargeText", app)
+        try app.performAccessibilityAudit(for: [.sufficientElementDescription])
+    }
+
+    // SwiftUI may call a partially exposed row hittable even when its centre is behind the keyboard.
+    // Reveal its actual tap point, including deeper extended nutrition and targets above the current scroll position.
     private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
-        for _ in 0..<10 {
-            if element.exists && element.isHittable { return }
+        for _ in 0..<20 {
+            let top = app.navigationBars.firstMatch.exists ? app.navigationBars.firstMatch.frame.maxY : app.frame.minY
+            let bottom = app.keyboards.firstMatch.exists ? app.keyboards.firstMatch.frame.minY : app.frame.maxY
+            if element.exists && element.isHittable && element.frame.midY > top && element.frame.midY < bottom - 12 { return }
+            let scrollBack = element.exists && element.frame.midY <= top
             // A short drag avoids jumping past a field when the keyboard reduces the visible Form height.
-            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.05,
-                thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)))
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: scrollBack ? 0.3 : 0.5)).press(forDuration: 0.05,
+                thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: scrollBack ? 0.5 : 0.3)))
         }
         XCTAssertTrue(element.exists && element.isHittable, "Could not reveal \(element)")
     }
@@ -325,7 +569,7 @@ final class TallyUITests: XCTestCase {
         // Decimal-pad Command-A is unreliable in this Simulator. Tap at the trailing edge to place the caret after the value.
         field.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.5)).tap()
         field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count))
-        XCTAssertTrue(["", "Optional"].contains(field.value as? String ?? ""))
+        XCTAssertTrue(["", field.placeholderValue ?? "Optional"].contains(field.value as? String ?? ""), "Field did not clear: \(field.value as? String ?? "")")
         field.typeText(value)
         XCTAssertEqual(field.value as? String, value)
     }

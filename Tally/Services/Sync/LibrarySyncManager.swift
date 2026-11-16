@@ -11,6 +11,11 @@ final class LibrarySyncManager: CKSyncEngineDelegate {
     let context: ModelContext
     let configuration: LibrarySyncConfiguration
     let allowsCloudAccess: Bool
+    // Production defaults are unchanged; isolated live checks supply their own zone, assets and subscription.
+    let zoneID: CKRecordZone.ID
+    let assetDirectory: URL
+    private let automaticallySync: Bool
+    private let subscriptionID: CKSubscription.ID?
     @ObservationIgnored var engine: CKSyncEngine?
     @ObservationIgnored private var accountObserver: AnyCancellable?
     @ObservationIgnored private var saveObserver: AnyCancellable?
@@ -24,13 +29,14 @@ final class LibrarySyncManager: CKSyncEngineDelegate {
     var pendingAccountID: String?
     var enabled: Bool { configuration.enabled && !sessionPaused }
     var lastCompletedAt: Date? { configuration.lastCompletedAt }
-    var assetDirectory: URL {
-        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("TallyCloudAssets", isDirectory: true)
-    }
     var cloudContainer: CKContainer { CKContainer(identifier: CloudTemplateCodec.containerID) }
 
-    init(context: ModelContext, allowsCloudAccess: Bool = true) throws {
+    init(context: ModelContext, allowsCloudAccess: Bool = true, zoneID: CKRecordZone.ID? = nil,
+         assetDirectory: URL? = nil, automaticallySync: Bool = true, subscriptionID: CKSubscription.ID? = nil) throws {
         self.context = context; self.allowsCloudAccess = allowsCloudAccess
+        self.zoneID = zoneID ?? CloudTemplateCodec.zoneID
+        self.assetDirectory = assetDirectory ?? FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("TallyCloudAssets", isDirectory: true)
+        self.automaticallySync = automaticallySync; self.subscriptionID = subscriptionID
         configuration = try LibrarySyncStore.configuration(in: context)
         if configuration.enabled { status = "Waiting for iCloud" }
         // Save notifications carry no payload into CloudKit; only pending template DTOs are subsequently read.
@@ -98,7 +104,7 @@ final class LibrarySyncManager: CKSyncEngineDelegate {
             guard engine === active, enabled else { return }
             guard account == configuration.accountID else { pauseForAccountChange(account); return }
             status = "Syncing"; errorMessage = nil
-            do { try await active.fetchChanges(.init(scope: .zoneIDs([CloudTemplateCodec.zoneID]))) }
+            do { try await active.fetchChanges(.init(scope: .zoneIDs([zoneID]))) }
             catch {
                 // On first opt-in the zone may not exist yet. Let the already-pending zone creation run next.
                 guard let cloud = error as? CKError, !configuration.zoneEstablished,
@@ -106,11 +112,28 @@ final class LibrarySyncManager: CKSyncEngineDelegate {
             }
             guard engine === active, enabled else { return }
             queuePendingChanges()
-            try await active.sendChanges()
+            try await sendPendingChanges()
             guard engine === active, enabled else { return }
             if errorMessage == nil { updateStatus() }
         } catch { if engine === active { show(error) } }
     }
+    /// CKSyncEngine reports record conflicts to the delegate and also throws them from sendChanges.
+    /// Re-send the delegate's resolved local winner, or finish quietly when the server winner cleared the outbox.
+    func sendPendingChanges() async throws {
+        guard let active = engine, enabled else { return }
+        for _ in 0..<3 {
+            do { try await active.sendChanges(); return }
+            catch {
+                guard engine === active, enabled else { return }
+                guard errorMessage == nil, CloudSyncFailure.isRecordConflict(error) else { throw error }
+                if try LibrarySyncStore.pending(in: context).isEmpty { return }
+                queuePendingChanges()
+            }
+        }
+        // Continuous concurrent edits remain visibly pending; automatic sync or a later manual exchange can retry.
+        updateStatus()
+    }
+
     func availableAccountID() async throws -> String {
         guard allowsCloudAccess else { throw LibrarySyncError.unavailable }
         let container = cloudContainer
@@ -127,13 +150,14 @@ final class LibrarySyncManager: CKSyncEngineDelegate {
             // A damaged opaque checkpoint can be rebuilt by refetching stable UUIDs; never reset the template store.
             configuration.engineState = nil; try context.save(); state = nil
         }
-        let config = CKSyncEngine.Configuration(database: cloudContainer.privateCloudDatabase, stateSerialization: state, delegate: self)
+        var config = CKSyncEngine.Configuration(database: cloudContainer.privateCloudDatabase, stateSerialization: state, delegate: self)
+        config.automaticallySync = automaticallySync; config.subscriptionID = subscriptionID
         engine = CKSyncEngine(config)
         // The SDK's sync engine requires silent remote notifications; no alert-notification permission is requested.
         UIApplication.shared.registerForRemoteNotifications()
         // Recreating an established zone on every launch could hide a deliberate remote library removal.
         if !configuration.zoneEstablished {
-            engine?.state.add(pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: CloudTemplateCodec.zoneID))])
+            engine?.state.add(pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: zoneID))])
         }
         queuePendingChanges()
         updateStatus()
@@ -149,7 +173,7 @@ final class LibrarySyncManager: CKSyncEngineDelegate {
                 message = "Local changes are saved. iCloud will retry when conditions allow, or use Sync Now."
             }
             let registered = Set(engine.state.pendingRecordZoneChanges)
-            let changes = pending.map { CKSyncEngine.PendingRecordZoneChange.saveRecord(CloudTemplateCodec.recordID($0.id)) }
+            let changes = pending.map { CKSyncEngine.PendingRecordZoneChange.saveRecord(CloudTemplateCodec.recordID($0.id, zoneID: zoneID)) }
             let missing = changes.filter { !registered.contains($0) }
             if !missing.isEmpty { engine.state.add(pendingRecordZoneChanges: missing) }
         } catch { failSafely(error) }

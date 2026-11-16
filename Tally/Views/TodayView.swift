@@ -7,14 +7,14 @@ struct TodayView: View {
     @Environment(HealthKitManager.self) private var health
     @Environment(\.dynamicTypeSize) private var typeSize
     @Query private var drinks: [SavedDrink]
-    @AppStorage("dailyCaffeineTarget") private var storedTarget = 400.0
     @AppStorage("showCalories") private var showCalories = true
     @AppStorage("showSugar") private var showSugar = true
     @AppStorage("showProtein") private var showProtein = true
     @AppStorage("showCaffeine") private var showCaffeine = true
+    // This preference affects presentation only; sodium is always available for entry and history.
+    @AppStorage("showSodium") private var showSodium = false
     @State private var sheet: DrinkSheet?
     let openLibrary: () -> Void
-    private var target: Double { storedTarget.isFinite && storedTarget > 0 ? storedTarget : 400 }
     private var columns: [GridItem] { [GridItem(.adaptive(minimum: typeSize.isAccessibilitySize ? 280 : 155), spacing: 12)] }
 
     var body: some View {
@@ -25,15 +25,21 @@ struct TodayView: View {
                     .font(.subheadline).foregroundStyle(.primary)
                 if !health.permissionsRequested || !health.isAvailable { HealthAccessCard() }
                 // Equal-weight cards avoid treating caffeine as a required part of every diet entry.
-                if showCalories || showProtein || showSugar || showCaffeine {
+                if showCalories || showProtein || showSugar || showCaffeine || showSodium {
                     Text("Nutrition Today").font(.title2.weight(.semibold))
                     LazyVGrid(columns: columns, spacing: 12) {
                         if showCalories { SecondaryNutritionCard(nutrient: .calories, nutrition: health.today) }
                         if showProtein { SecondaryNutritionCard(nutrient: .protein, nutrition: health.today) }
                         if showSugar { SecondaryNutritionCard(nutrient: .sugar, nutrition: health.today) }
-                        if showCaffeine { CaffeineSummaryCard(nutrition: health.today, target: target) }
+                        if showCaffeine { CaffeineSummaryCard(nutrition: health.today) }
+                        if showSodium { SecondaryNutritionCard(nutrient: .sodium, nutrition: health.today) }
                     }
                 }
+                // The breakdown remains accessible even when every dashboard card is hidden.
+                NavigationLink {
+                    DailyIntakeBreakdownView()
+                } label: { Label("Daily Intake Breakdown", systemImage: "chart.bar.xaxis") }
+                    .accessibilityIdentifier("dailyIntakeBreakdown")
                 if let error = health.queryError {
                     VStack(alignment: .leading, spacing: 8) {
                         Label("Health refresh needs attention", systemImage: "exclamationmark.circle").font(.headline)
@@ -63,7 +69,7 @@ struct TodayView: View {
                     }
                 }
                 Button { sheet = .quickAdd } label: {
-                    Label("Quick Add a one-off entry", systemImage: "bolt.badge.plus").frame(maxWidth: .infinity, minHeight: 32)
+                    Label("Quick Add a one-off entry", systemImage: "plus.circle").frame(maxWidth: .infinity, minHeight: 32)
                 }.buttonStyle(.bordered)
                 if showCaffeine { CaffeineTrendView(days: health.caffeineDays) }
             }.padding(20)
@@ -74,7 +80,7 @@ struct TodayView: View {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 if health.isLoading { ProgressView().accessibilityLabel("Refreshing Apple Health") }
                 Menu {
-                    Button("Quick Add", systemImage: "bolt.badge.plus") { sheet = .quickAdd }
+                    Button("Quick Add", systemImage: "plus.circle") { sheet = .quickAdd }
                     Button("Add Saved Item", systemImage: "plus") { sheet = .add }
                 } label: { Image(systemName: "plus") }.accessibilityLabel("Add food or drink")
             }

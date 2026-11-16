@@ -45,7 +45,7 @@ The format remains version 1, including the legacy `drinks` key, so exports from
 
 ## Developer setup
 
-The project targets iOS 27 using the installed Xcode 27 SDK. CloudKit APIs were checked against that SDK’s Swift interfaces before implementation. The original `SavedDrink` schema uses a unique UUID and includes local-only statistics, so automatic SwiftData CloudKit integration stays disabled. The additive local metadata and explicit `CKSyncEngine` transport are described in [architecture notes](DATA_AND_ARCHITECTURE.md). Apple documents [SwiftData CloudKit schema constraints](https://developer.apple.com/documentation/swiftdata/syncing-model-data-across-a-persons-devices) and [CKSyncEngine’s persistence/scheduling responsibilities](https://developer.apple.com/documentation/cloudkit/cksyncengine-5sie5).
+The project targets iOS 27 using the installed Xcode 27 SDK. Signing explicitly selects Development CloudKit for Debug and Production for Release. CloudKit APIs were checked against that SDK’s Swift interfaces before implementation. The original `SavedDrink` schema uses a unique UUID and includes local-only statistics, so automatic SwiftData CloudKit integration stays disabled. The additive local metadata and explicit `CKSyncEngine` transport are described in [architecture notes](DATA_AND_ARCHITECTURE.md). Apple documents [SwiftData CloudKit schema constraints](https://developer.apple.com/documentation/swiftdata/syncing-model-data-across-a-persons-devices) and [CKSyncEngine’s persistence/scheduling responsibilities](https://developer.apple.com/documentation/cloudkit/cksyncengine-5sie5).
 
 1. Sign into the appropriate Apple Developer account in **Xcode → Settings → Accounts**. Use a team eligible for CloudKit and Push Notifications.
 2. In Tally’s **Signing & Capabilities**, create/select container **`iCloud.gale-k.Tally`**, with **iCloud → CloudKit**, **Push Notifications**, and **Background Modes → Remote notifications** enabled. HealthKit must remain enabled. Regenerate/select a provisioning profile containing these capabilities.
@@ -54,6 +54,10 @@ The project targets iOS 27 using the installed Xcode 27 SDK. CloudKit APIs were 
 5. Silent remote notifications are registered only after opt-in. Tally does not request visible notification permission. Signing into iCloud on the phone and enabling Tally’s iCloud access are separate from the developer’s signing account on the Mac.
 
 A checked-in entitlement/container identifier is not evidence that the container exists or that the current provisioning profile supports it. See [issue #1 verification](ISSUE_1_VERIFICATION.md) for actual build results and external prerequisites still outstanding.
+
+## Verification status
+
+[Live verification on one iPhone and this Mac](LIVE_ICLOUD_VERIFICATION.md) passed real CloudKit exchanges/conflicts/recovery and a synthetic iCloud Drive upload/download/restore. These checks use isolated clients and scratch resources, not two physical phones. The native iPhone Files-picker flow, physical network/account/quota cases, and Production environment remain unverified.
 
 ## Two-device verification still required
 

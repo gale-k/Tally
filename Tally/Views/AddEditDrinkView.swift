@@ -20,18 +20,18 @@ struct AddEditDrinkView: View {
                 TextField("Item Name", text: $draft.name).textInputAutocapitalization(.words).accessibilityIdentifier("drinkName")
                 TextField("Brand / Location", text: $draft.brand).textInputAutocapitalization(.words)
                 TextField("Serving size (optional)", text: $draft.size)
-                // Stack the optional liquid field at accessibility sizes rather than splitting its label into fragments.
+                // Keep the amount and its unit together, with extra label space at accessibility sizes.
                 if typeSize.isAccessibilitySize {
-                    VStack(alignment: .leading, spacing: 8) { Text("Volume (optional)"); volumeInput }
+                    VStack(alignment: .leading, spacing: 8) { Text("Amount (optional)"); amountInput }
                 } else {
-                    HStack { Text("Volume (optional)"); volumeInput }
+                    HStack { Text("Amount (optional)"); amountInput }
                 }
                 Picker("Category", selection: $draft.category) {
                     ForEach(DrinkCategory.allCases) { Text($0.title).tag($0) }
-                }
+                }.accessibilityIdentifier("itemCategory")
                 Picker("Serving style (optional)", selection: $draft.servingStyle) {
                     ForEach(ServingStyle.allCases) { Text($0.title).tag($0) }
-                }
+                }.accessibilityIdentifier("servingStyle")
                 Toggle("Favourite", isOn: $draft.isFavourite)
             }
             NutritionFormSection(draft: $draft)
@@ -53,11 +53,17 @@ struct AddEditDrinkView: View {
         }
         .errorAlert($error, title: "Couldn’t save item")
     }
-    private var volumeInput: some View {
+    // A menu keeps both measurement choices available without converting the entered number.
+    private var amountInput: some View {
         HStack {
-            TextField("Optional", text: $draft.volume).keyboardType(.decimalPad).multilineTextAlignment(.trailing)
-                .accessibilityLabel("Volume, millilitres")
-            Text("ml").foregroundStyle(.secondary)
+            TextField("Optional", text: $draft.amount).keyboardType(.decimalPad).multilineTextAlignment(.trailing)
+                .accessibilityLabel("Amount, \(draft.amountUnit.title)")
+                .accessibilityIdentifier("servingAmount")
+            Picker("Amount unit", selection: $draft.amountUnit) {
+                ForEach(ServingAmountUnit.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.menu).labelsHidden()
+            .accessibilityIdentifier("amountUnit")
         }
     }
 }
