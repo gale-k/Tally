@@ -15,6 +15,7 @@ struct TodayView: View {
     @AppStorage("showSodium") private var showSodium = false
     @State private var sheet: DrinkSheet?
     @State private var nutritionStatusHeight: CGFloat = 0
+    @State private var drinkCardHeight: CGFloat = 0
     let openLibrary: () -> Void
     private var columns: [GridItem] { [GridItem(.adaptive(minimum: typeSize.isAccessibilitySize ? 280 : 155), spacing: 12)] }
 
@@ -70,9 +71,11 @@ struct TodayView: View {
                 } else {
                     LazyVGrid(columns: columns, spacing: 12) {
                         ForEach(DrinkOrdering.quickLog(drinks)) { drink in
-                            DrinkCard(drink: drink) { sheet = .log(drink) }
+                            DrinkCard(drink: drink, alignedHeight: typeSize.isAccessibilitySize ? nil : drinkCardHeight) { sheet = .log(drink) }
                         }
                     }
+                    // Keep all Quick Log cards even; accessibility sizes retain their natural height.
+                    .onPreferenceChange(DrinkCardHeightKey.self) { drinkCardHeight = $0 }
                 }
                 Button { sheet = .quickAdd } label: {
                     Label("Quick Add a one-off entry", systemImage: "plus.circle").frame(maxWidth: .infinity, minHeight: 32)
