@@ -61,11 +61,11 @@ struct TodayView: View {
                     Spacer()
                     Button("Library", action: openLibrary).font(.subheadline)
                 }
-                if drinks.isEmpty {
+                if DrinkOrdering.quickLog(drinks).isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("A home for your usuals").font(.headline)
-                        Text("Save a food or drink once. Log its known nutrition again in a couple of taps.").font(.subheadline).foregroundStyle(.secondary)
-                        Button("Add Your First Item") { sheet = .add }.buttonStyle(.borderedProminent).foregroundStyle(Color(.systemBackground))
+                        Text(drinks.isEmpty ? "A home for your usuals" : "No active items").font(.headline)
+                        Text(drinks.isEmpty ? "Save a food or drink once. Log its known nutrition again in a couple of taps." : "Restore an archived item from Library or add a new one.").font(.subheadline).foregroundStyle(.secondary)
+                        Button(drinks.isEmpty ? "Add Your First Item" : "Add Item") { sheet = .add }.buttonStyle(.borderedProminent).foregroundStyle(Color(.systemBackground))
                     }.frame(maxWidth: .infinity, alignment: .leading).padding(18)
                         .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
                 } else {

@@ -7,6 +7,7 @@ final class ExportTests: XCTestCase {
     func testJSONRoundTripPreservesTemplatesAndExcludesConsumption() throws {
         let original = SavedDrink(name: "Chai", brandOrLocation: "Fuel", volumeMl: 330, category: .teaChai,
                                   nutrition: .init(caffeine: 0, estimated: [.caffeine]), isFavourite: true, lastLoggedAt: .now, timesLogged: 9)
+        original.isArchived = true
         let data = try DrinkExportService.export([original])
         let json = try XCTUnwrap(String(data: data, encoding: .utf8))
         XCTAssertFalse(json.contains("timesLogged"))
@@ -15,6 +16,7 @@ final class ExportTests: XCTestCase {
         XCTAssertEqual(restored.id, original.id)
         XCTAssertEqual(restored.nutrition, original.nutrition)
         XCTAssertTrue(restored.isFavourite)
+        XCTAssertTrue(restored.isArchived)
         XCTAssertEqual(restored.timesLogged, 0)
         XCTAssertNil(restored.caloriesKcal)
     }
@@ -73,6 +75,7 @@ final class ExportTests: XCTestCase {
         XCTAssertNil(item.weightG)
         XCTAssertEqual(item.nutrition.formatted(.caffeine), "~100 mg")
         XCTAssertTrue(item.isFavourite)
+        XCTAssertFalse(item.isArchived)
         XCTAssertNil(item.proteinG)
         // Older snapshots do not invent a sodium amount when the optional key is absent.
         XCTAssertNil(item.sodiumMg)
@@ -90,11 +93,13 @@ final class ExportTests: XCTestCase {
     /// Mass and Cold must survive the same snapshot import/restore paths as existing liquid templates.
     func testWeightAndColdRoundTripThroughImportAndRestore() throws {
         let item = SavedDrink(name: "Chocolate", weightG: 45, category: .snack, servingStyle: .cold)
+        item.isArchived = true
         let data = try DrinkExportService.export([item])
         for mode in [LibraryImportMode.addMissing, .restoreCopies] {
             let container = try LibraryStore.container(configuration: ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none))
             XCTAssertEqual(try DrinkExportService.importDrinks(data, into: container.mainContext, mode: mode).imported, 1)
             let restored = try XCTUnwrap(container.mainContext.fetch(FetchDescriptor<SavedDrink>()).first)
+            XCTAssertTrue(restored.isArchived)
             XCTAssertEqual(restored.weightG, 45)
             XCTAssertNil(restored.volumeMl)
             XCTAssertEqual(restored.servingStyle, .cold)

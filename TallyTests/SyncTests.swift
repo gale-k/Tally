@@ -3,6 +3,84 @@ import SwiftData
 import CloudKit
 @testable import Tally
 
+// The exact pre-archive schema creates an on-disk store for a real lightweight migration test.
+private enum PreArchiveSchema {
+    @Model
+    final class SavedDrink {
+        @Attribute(.unique) var id: UUID
+        var name: String
+        var brandOrLocation: String?
+        var size: String?
+        var volumeMl: Double?
+        // An additive optional property preserves existing liquid amounts and allows lightweight store migration.
+        var weightG: Double?
+        var categoryRaw: String
+        var servingStyleRaw: String
+        var caffeineMg: Double?
+        var caloriesKcal: Double?
+        var sugarG: Double?
+        var carbohydratesG: Double?
+        var proteinG: Double?
+        var totalFatG: Double?
+        var saturatedFatG: Double?
+        var fibreG: Double?
+        // Additive optional storage preserves existing templates through lightweight migration.
+        var sodiumMg: Double?
+        var estimatedNutrients: [String]
+        var notes: String?
+        var isFavourite: Bool
+        var createdAt: Date
+        var updatedAt: Date
+        var lastLoggedAt: Date?
+        var timesLogged: Int
+
+        init(id: UUID = UUID(), name: String, brandOrLocation: String? = nil, size: String? = nil,
+             volumeMl: Double? = nil, weightG: Double? = nil, category: DrinkCategory = .other, servingStyle: ServingStyle = .other,
+             nutrition: NutritionValues = .init(), notes: String? = nil, isFavourite: Bool = false,
+             createdAt: Date = .now, updatedAt: Date = .now, lastLoggedAt: Date? = nil, timesLogged: Int = 0) {
+            self.id = id
+            self.name = name
+            self.brandOrLocation = brandOrLocation
+            self.size = size
+            self.volumeMl = volumeMl
+            self.weightG = weightG
+            self.categoryRaw = category.rawValue
+            self.servingStyleRaw = servingStyle.rawValue
+            caffeineMg = nutrition.caffeine
+            caloriesKcal = nutrition.calories
+            sugarG = nutrition.sugar
+            carbohydratesG = nutrition.carbohydrates
+            proteinG = nutrition.protein
+            totalFatG = nutrition.totalFat
+            saturatedFatG = nutrition.saturatedFat
+            fibreG = nutrition.fibre
+            sodiumMg = nutrition.sodium
+            estimatedNutrients = nutrition.estimated.map(\.rawValue).sorted()
+            self.notes = notes
+            self.isFavourite = isFavourite
+            self.createdAt = createdAt
+            self.updatedAt = updatedAt
+            self.lastLoggedAt = lastLoggedAt
+            self.timesLogged = timesLogged
+        }
+
+        var category: DrinkCategory { DrinkCategory(rawValue: categoryRaw) ?? .other }
+        var servingStyle: ServingStyle { ServingStyle(rawValue: servingStyleRaw) ?? .other }
+        var nutrition: NutritionValues {
+            get { .init(caffeine: caffeineMg, calories: caloriesKcal, sugar: sugarG, carbohydrates: carbohydratesG,
+                        protein: proteinG, totalFat: totalFatG, saturatedFat: saturatedFatG, fibre: fibreG, sodium: sodiumMg,
+                        estimated: Set(estimatedNutrients.compactMap(Nutrient.init(rawValue:)))) }
+            set {
+                caffeineMg = newValue.caffeine; caloriesKcal = newValue.calories; sugarG = newValue.sugar
+                carbohydratesG = newValue.carbohydrates; proteinG = newValue.protein; totalFatG = newValue.totalFat
+                saturatedFatG = newValue.saturatedFat; fibreG = newValue.fibre
+                sodiumMg = newValue.sodium
+                estimatedNutrients = newValue.estimated.map(\.rawValue).sorted()
+            }
+        }
+    }
+}
+
 /// These tests exercise real local persistence and CloudKit record conversion without contacting iCloud or Health.
 @MainActor
 final class SyncTests: XCTestCase {
@@ -113,6 +191,28 @@ final class SyncTests: XCTestCase {
             XCTAssertEqual(SavedDrinkRecord(item), SavedDrinkRecord(remote))
         }
     }
+    /// Incoming archive edits preserve local usage, and old payloads without the key restore active state.
+    func testArchiveSyncAndLegacyPayload() throws {
+        let container = try store(); let context = container.mainContext
+        let item = SavedDrink(name: "Local", lastLoggedAt: .now, timesLogged: 4)
+        context.insert(item); try context.save()
+        try DrinkLibrary.setArchived(true, for: item, in: context)
+        let row = try XCTUnwrap(LibrarySyncStore.state(for: item.id, in: context))
+        let outgoing = try LibrarySyncStore.change(row)
+        XCTAssertFalse(outgoing.isDeleted); XCTAssertEqual(outgoing.template?.isArchived, true)
+        var remote = try XCTUnwrap(outgoing.template)
+        remote.isArchived = nil
+        let data = try JSONEncoder().encode(remote)
+        let legacy = try JSONDecoder().decode(SavedDrinkRecord.self, from: data)
+        XCTAssertNil(legacy.isArchived)
+        let incoming = CloudTemplateChange(id: item.id, modifiedAt: row.modifiedAt.addingTimeInterval(10), revision: UUID().uuidString, template: legacy)
+        try LibrarySyncStore.receive(incoming, systemFields: nil, in: context); try context.save()
+        XCTAssertFalse(item.isArchived); XCTAssertEqual(item.timesLogged, 4); XCTAssertNotNil(item.lastLoggedAt)
+        remote.isArchived = true
+        let next = CloudTemplateChange(id: item.id, modifiedAt: incoming.modifiedAt.addingTimeInterval(10), revision: UUID().uuidString, template: remote)
+        try LibrarySyncStore.receive(next, systemFields: nil, in: context); try context.save()
+        XCTAssertTrue(item.isArchived); XCTAssertEqual(item.timesLogged, 4)
+    }
     func testNewerLocalEditAndStaleAcknowledgementStayPending() throws {
         let container = try store(); let context = container.mainContext
         let item = SavedDrink(name: "Original"); context.insert(item)
@@ -215,13 +315,14 @@ final class SyncTests: XCTestCase {
         let configuration = ModelConfiguration(url: folder.appendingPathComponent("Library.store"), cloudKitDatabase: .none)
         let id = UUID(); let logged = Date(timeIntervalSince1970: 1_700_000_000)
         do {
-            let legacy = try ModelContainer(for: SavedDrink.self, configurations: configuration)
-            legacy.mainContext.insert(SavedDrink(id: id, name: "Coffee", category: .coffee, servingStyle: .iced,
+            let legacy = try ModelContainer(for: PreArchiveSchema.SavedDrink.self, configurations: configuration)
+            legacy.mainContext.insert(PreArchiveSchema.SavedDrink(id: id, name: "Coffee", category: .coffee, servingStyle: .iced,
                                                 nutrition: .init(caffeine: 0, protein: 6, estimated: [.caffeine]), isFavourite: true, lastLoggedAt: logged, timesLogged: 12))
             try legacy.mainContext.save()
         }
         let upgraded = try LibraryStore.container(configuration: configuration)
         let item = try XCTUnwrap(upgraded.mainContext.fetch(FetchDescriptor<SavedDrink>()).first)
+        XCTAssertFalse(item.isArchived)
         XCTAssertEqual(item.id, id); XCTAssertEqual(item.caffeineMg, 0); XCTAssertNil(item.caloriesKcal)
         XCTAssertEqual(item.nutrition.estimated, [.caffeine]); XCTAssertTrue(item.isFavourite)
         XCTAssertEqual(item.timesLogged, 12); XCTAssertEqual(item.lastLoggedAt, logged); XCTAssertEqual(item.servingStyle, .iced)

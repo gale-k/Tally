@@ -5,7 +5,7 @@ A native iPhone nutrition utility for saving your usual foods and drinks and log
 ## What it does
 
 - Save reusable foods and drinks with favourites, brands, serving sizes, notes, and optional nutrition.
-- Find a saved item with search, category filters, five sort orders, and ranked Quick Log cards.
+- Find a saved item with search, category filters, five sort orders, and ranked Quick Log cards. Archive items you no longer use and restore them from the Library’s Archived view.
 - Review an item and its time before logging, or use Quick Add for a one-off entry.
 - Choose calorie, protein, sugar, caffeine, and sodium summaries on Today, with recent Health history and an optional seven-day caffeine chart.
 - Compare nine daily nutrient totals with editable adult references, personal targets, or maximums, with a full Daily Intake breakdown.
@@ -43,7 +43,7 @@ Existing libraries and version-1 JSON exports continue to work. The internal `Sa
 
 ## Data and privacy
 
-Reusable food and drink templates remain available in this device’s SwiftData store. Optional iCloud sync sends template details, including nutrition, notes, and favourites, to your private CloudKit database after confirmation in Settings. Actual consumption is saved as independent HealthKit samples and queried from Apple Health. Editing or deleting a template never changes historical samples.
+Reusable food and drink templates remain available in this device’s SwiftData store. Optional iCloud sync sends template details, including nutrition, notes, favourites, and archive state, to your private CloudKit database after confirmation in Settings. Actual consumption is saved as independent HealthKit samples and queried from Apple Health. Editing, archiving, or deleting a template never changes historical samples.
 
 Today’s totals and history show **visible Apple Health nutrition from all sources**, including other apps and foods. They are not presented as drinks-only totals. Empty results cannot establish whether read permission was denied. Limited-history access is respected. Pull to refresh, or return to Tally after changing data or permissions in Health.
 

@@ -28,6 +28,14 @@ enum DrinkLibrary {
         }
         catch { context.rollback(); throw error }
     }
+    /// Archiving is a template edit, so it shares the save/rollback and sync boundary with other edits.
+    static func setArchived(_ archived: Bool, for drink: SavedDrink, in context: ModelContext) throws {
+        do {
+            drink.isArchived = archived; drink.updatedAt = .now
+            try LibrarySyncStore.stage(drink, in: context)
+            try context.save()
+        } catch { context.rollback(); throw error }
+    }
     @discardableResult
     static func duplicate(_ drink: SavedDrink, in context: ModelContext) throws -> SavedDrink {
         var draft = DrinkDraft(drink: drink)
@@ -79,7 +87,8 @@ enum DrinkOrdering {
         }
     }
     static func quickLog(_ drinks: [SavedDrink]) -> [SavedDrink] {
-        let sorted = drinks.sorted { a, b in
+        // Exclude archived favourites before ranking and applying the six-item limit.
+        let sorted = drinks.filter { !$0.isArchived }.sorted { a, b in
             if a.isFavourite != b.isFavourite { return a.isFavourite }
             if a.lastLoggedAt != b.lastLoggedAt { return (a.lastLoggedAt ?? .distantPast) > (b.lastLoggedAt ?? .distantPast) }
             if a.timesLogged != b.timesLogged { return a.timesLogged > b.timesLogged }

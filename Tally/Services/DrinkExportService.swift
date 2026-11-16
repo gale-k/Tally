@@ -15,6 +15,8 @@ struct SavedDrinkRecord: Codable, Equatable, Sendable {
     var nutrition: NutritionValues
     var notes: String?
     var isFavourite: Bool
+    // Missing in older version-1 snapshots and sync payloads means active.
+    var isArchived: Bool?
     var createdAt: Date
     var updatedAt: Date
 
@@ -22,6 +24,7 @@ struct SavedDrinkRecord: Codable, Equatable, Sendable {
         id = drink.id; name = drink.name; brandOrLocation = drink.brandOrLocation; size = drink.size
         volumeMl = drink.volumeMl; weightG = drink.weightG; category = drink.category; servingStyle = drink.servingStyle
         nutrition = drink.nutrition; notes = drink.notes; isFavourite = drink.isFavourite
+        isArchived = drink.isArchived
         createdAt = drink.createdAt; updatedAt = drink.updatedAt
     }
     func validate() throws {
@@ -35,9 +38,11 @@ struct SavedDrinkRecord: Codable, Equatable, Sendable {
         try nutrition.validate()
     }
     func makeDrink() -> SavedDrink {
-        SavedDrink(id: id, name: name.trimmingCharacters(in: .whitespacesAndNewlines), brandOrLocation: brandOrLocation,
+        let drink = SavedDrink(id: id, name: name.trimmingCharacters(in: .whitespacesAndNewlines), brandOrLocation: brandOrLocation,
                    size: size, volumeMl: volumeMl, weightG: weightG, category: category, servingStyle: servingStyle,
                    nutrition: nutrition, notes: notes, isFavourite: isFavourite, createdAt: createdAt, updatedAt: updatedAt)
+        drink.isArchived = isArchived ?? false
+        return drink
     }
 }
 

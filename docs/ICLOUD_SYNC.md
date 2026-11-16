@@ -2,7 +2,9 @@
 
 ## What syncs
 
-Sync is off by default. In **Settings → iCloud Library**, choose **Enable iCloud Sync** and confirm the merge. Tally uses Apple’s CloudKit private database for the signed-in iCloud account; no Tally account or custom server is involved. Saved food/drink identities, names, brand/location, serving details, all known nutrition, estimate markers, notes, favourites, and template creation/edit dates are included. Blank amounts stay unknown and explicit zeroes stay zero.
+Sync is off by default. In **Settings → iCloud Library**, choose **Enable iCloud Sync** and confirm the merge. Tally uses Apple’s CloudKit private database for the signed-in iCloud account; no Tally account or custom server is involved. Saved food/drink identities, names, brand/location, serving details, all known nutrition, estimate markers, notes, favourites, archive state, and template creation/edit dates are included. Blank amounts stay unknown and explicit zeroes stay zero.
+
+Archiving and unarchiving are ordinary synced template edits, not deletion markers. Older payloads without archive state are treated as active. Archived items remain editable in Library and do not appear in Quick Log.
 
 Templates remain in the local SwiftData store and can be created, edited, searched, logged, imported, and deleted offline. Pending template changes are saved with the local transaction and can retry after a relaunch. **Sync Now** asks for a fetch/send exchange; automatic scheduling and transient retries depend on the system and network conditions.
 
@@ -41,7 +43,7 @@ If the entire remote private zone is removed, syncing pauses rather than silentl
 4. To add missing items after reinstalling or changing phones, choose **Import Library** and select the snapshot. Existing UUIDs are skipped, so repeating that import does not duplicate current items.
 5. To recover an older template while keeping its current version, choose **Restore Snapshot as New Copies**, select the snapshot, and confirm. Every snapshot item receives a new UUID, so duplicates are expected and existing items are not overwritten. Review/delete unwanted copies afterwards.
 
-The format remains version 1, including the legacy `drinks` key, so exports from before iCloud support remain supported. The complete document is validated before a transactional import. Unsupported versions, duplicate IDs within the file, invalid nutrition, more than 5,000 records, or more than 5 MB fail without partial insertion. Restored/imported items start with zero usage and no last-logged date. When sync is enabled, additions join the normal template outbox. A snapshot does not contain or restore Health history.
+Archive state is included in snapshots; older snapshots without it import as active. The format remains version 1, including the legacy `drinks` key, so exports from before iCloud support remain supported. The complete document is validated before a transactional import. Unsupported versions, duplicate IDs within the file, invalid nutrition, more than 5,000 records, or more than 5 MB fail without partial insertion. Restored/imported items start with zero usage and no last-logged date. When sync is enabled, additions join the normal template outbox. A snapshot does not contain or restore Health history.
 
 ## Developer setup
 
@@ -61,6 +63,6 @@ A checked-in entitlement/container identifier is not evidence that the container
 
 ## Two-device verification still required
 
-Use synthetic data on two iPhones signed into the same iCloud account. Enable sync explicitly on both, then check creation, every optional field/estimate, edit, favourite, deletion, repeated sync, relaunch, and offline changes followed by reconnect. Make concurrent edits and an edit/deletion conflict and compare the documented winner. Check the absence of duplicate UUIDs and that each phone’s local usage counts/preferences and Health history remain independent.
+Use synthetic data on two iPhones signed into the same iCloud account. Enable sync explicitly on both, then check creation, every optional field/estimate, edit, favourite, archive/unarchive, deletion, repeated sync, relaunch, and offline changes followed by reconnect. Make concurrent edits and an edit/deletion conflict and compare the documented winner. Check the absence of duplicate UUIDs and that each phone’s local usage counts/preferences and Health history remain independent.
 
 Export a dated snapshot to iCloud Drive. Verify ordinary import is idempotent and explicit restore-as-copies recovers an older value without overwriting current templates. Check sign-out, account switch with cancelled and confirmed merge, quota/network errors, and private-zone removal. Never delete an existing user’s production zone as a test. Record real outcomes separately from local model/codec tests; simulator fixtures do not establish live CloudKit convergence.

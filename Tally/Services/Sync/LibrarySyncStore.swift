@@ -147,6 +147,8 @@ enum LibrarySyncStore {
         item.volumeMl = record.volumeMl; item.weightG = record.weightG
         item.categoryRaw = record.category.rawValue; item.servingStyleRaw = record.servingStyle.rawValue
         item.nutrition = record.nutrition; item.notes = record.notes; item.isFavourite = record.isFavourite
+        // A payload from an older client has no archive field and represents an active template.
+        item.isArchived = record.isArchived ?? false
         item.createdAt = record.createdAt; item.updatedAt = record.updatedAt
     }
 }
