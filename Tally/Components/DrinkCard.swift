@@ -4,6 +4,7 @@ import SwiftUI
 /// Secondary grouped surfaces preserve rounded-card separation in dark appearance.
 struct DrinkCard: View {
     let drink: SavedDrink
+    var alignedHeight: CGFloat?
     let action: () -> Void
     var body: some View {
         Button(action: action) {
@@ -30,12 +31,28 @@ struct DrinkCard: View {
             }
             .frame(maxWidth: .infinity, minHeight: 130, alignment: .topLeading)
             .padding(16)
+            // Measure the natural content before applying the grid's shared height, so it can also shrink again.
+            .fixedSize(horizontal: false, vertical: true)
+            .background {
+                GeometryReader { proxy in
+                    Color.clear.preference(key: DrinkCardHeightKey.self, value: proxy.size.height)
+                }
+            }
+            .frame(minHeight: alignedHeight, alignment: .topLeading)
             .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
             .contentShape(RoundedRectangle(cornerRadius: 20))
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
         .accessibilityHint("Review and confirm logging this item to Apple Health")
+    }
+}
+
+// The tallest visible card supplies the minimum height for the rest of Quick Log.
+struct DrinkCardHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
 
