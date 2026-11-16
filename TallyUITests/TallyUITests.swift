@@ -12,6 +12,26 @@ final class TallyUITests: XCTestCase {
         capture("Empty-Today", app)
     }
 
+    /// The appearance preference starts at System and survives a fresh app launch.
+    func testAppearanceSelectionPersists() {
+        var app = launch(["--test-appearance-setting"])
+        app.tabBars.buttons["Settings"].tap()
+        let dark = app.buttons["Dark"]
+        reveal(dark, in: app)
+        XCTAssertTrue(app.buttons["System"].isSelected)
+        dark.tap()
+        XCTAssertTrue(dark.isSelected)
+        app.terminate()
+        app = launch(["--test-appearance-setting", "--preserve-preferences"])
+        app.tabBars.buttons["Settings"].tap()
+        reveal(app.buttons["Dark"], in: app)
+        XCTAssertTrue(app.buttons["Dark"].isSelected)
+        app.buttons["Light"].tap()
+        XCTAssertTrue(app.buttons["Light"].isSelected)
+        app.buttons["System"].tap()
+        XCTAssertTrue(app.buttons["System"].isSelected)
+    }
+
     func testCreateTemplateWithUnknownNutritionAndSearch() {
         let app = launch()
         app.tabBars.buttons["Library"].tap()

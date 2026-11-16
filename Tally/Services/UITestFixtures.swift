@@ -57,7 +57,7 @@ final class FixtureNutritionStore: NutritionStore {
 struct DevelopmentAppearance: ViewModifier {
     func body(content: Content) -> some View {
         let args = ProcessInfo.processInfo.arguments
-        if args.contains("--ui-testing") {
+        if args.contains("--ui-testing") && !args.contains("--test-appearance-setting") {
             if args.contains("--large-text") {
                 content.preferredColorScheme(args.contains("--dark-mode") ? .dark : .light)
                     .dynamicTypeSize(.accessibility3)

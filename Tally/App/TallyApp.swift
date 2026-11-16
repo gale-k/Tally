@@ -1,9 +1,25 @@
 import SwiftUI
 import SwiftData
 
+/// A nil scheme follows changes to the device's appearance automatically.
+enum AppAppearance: String, CaseIterable, Identifiable {
+    case system, light, dark
+
+    var id: String { rawValue }
+    var title: String { rawValue.capitalized }
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: nil
+        case .light: .light
+        case .dark: .dark
+        }
+    }
+}
+
 /// Tally keeps one local container; optional CloudKit sync transfers only explicit template records. A store error is shown instead of discarding the library.
 @main
 struct TallyApp: App {
+    @AppStorage("appearance") private var appearance: AppAppearance = .system
     @State private var health: HealthKitManager
     @State private var sync: LibrarySyncManager?
     private let container: ModelContainer?
@@ -16,7 +32,7 @@ struct TallyApp: App {
         let usesTestData = uiTesting || ProcessInfo.processInfo.arguments.contains("--isolated-test-host")
         if uiTesting && !ProcessInfo.processInfo.arguments.contains("--preserve-preferences") {
             // UI-test presentation choices must not leak into the next test; normal device preferences are untouched.
-            for key in ["showCalories", "showProtein", "showSugar", "showCaffeine", "showSodium"] { UserDefaults.standard.removeObject(forKey: key) }
+            for key in ["showCalories", "showProtein", "showSugar", "showCaffeine", "showSodium", "appearance"] { UserDefaults.standard.removeObject(forKey: key) }
             for reference in DailyIntakeReference.all {
                 UserDefaults.standard.removeObject(forKey: reference.valueKey)
                 UserDefaults.standard.removeObject(forKey: reference.enabledKey)
@@ -54,17 +70,20 @@ struct TallyApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if let container, let sync {
+            Group {
+                if let container, let sync {
                 #if DEBUG
                 RootView().modelContainer(container).environment(health).environment(sync).tint(Color.accentColor).modifier(DevelopmentAppearance())
                 #else
                 RootView().modelContainer(container).environment(health).environment(sync).tint(Color.accentColor)
                 #endif
-            } else {
-                ContentUnavailableView("Your library couldn’t open", systemImage: "externaldrive.badge.exclamationmark",
-                                       description: Text(startupError ?? "Please reopen Tally to try again. Your library has not been reset."))
-                    .padding()
+                } else {
+                    ContentUnavailableView("Your library couldn’t open", systemImage: "externaldrive.badge.exclamationmark",
+                                           description: Text(startupError ?? "Please reopen Tally to try again. Your library has not been reset."))
+                        .padding()
+                }
             }
+            .preferredColorScheme(appearance.colorScheme)
         }
     }
 }

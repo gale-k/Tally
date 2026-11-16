@@ -12,6 +12,7 @@ struct SettingsView: View {
     @AppStorage("showSugar") private var showSugar = true
     @AppStorage("showProtein") private var showProtein = true
     @AppStorage("showCaffeine") private var showCaffeine = true
+    @AppStorage("appearance") private var appearance: AppAppearance = .system
     // Opt-in keeps the existing Today layout until sodium tracking is requested.
     @AppStorage("showSodium") private var showSodium = false
     @State private var requesting = false
@@ -42,6 +43,15 @@ struct SettingsView: View {
                 NavigationLink("Daily Intake") { DailyIntakeSettingsView() }
                     .accessibilityIdentifier("dailyIntakeSettings")
             } footer: { Text("Adult references and personal targets or maximums for nine nutrients. Edit or turn off each daily comparison.") }
+            // The saved selection applies to the whole app and remains local to this device.
+            Section("Appearance") {
+                Picker("Appearance", selection: $appearance) {
+                    ForEach(AppAppearance.allCases) { option in
+                        Text(option.title).tag(option)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
             Section {
                 LabeledContent("Health data", value: health.isAvailable ? "Available" : "Unavailable")
                 LabeledContent("Permissions requested", value: health.permissionsRequested ? "Yes" : "Not yet")
