@@ -13,6 +13,8 @@ final class HealthKitManager {
     private(set) var isSaving = false
     private(set) var samples: [HealthSample] = []
     private(set) var events: [ConsumptionEvent] = []
+    // The dashboard and its drill-down are replaced together from the same local-day snapshot.
+    private(set) var todayEvents: [ConsumptionEvent] = []
     private(set) var historyDays: [HistoryDay] = []
     private(set) var today = NutritionValues()
     private(set) var caffeineDays: [CaffeineDay] = []
@@ -54,7 +56,7 @@ final class HealthKitManager {
         guard isAvailable, permissionsRequested else { return }
         let window = DateWindows.day(containing: now)
         // Never compare yesterday's total with today's target if the new day's query fails.
-        if todayWindow != window { today = NutritionValues(); todayWindow = window }
+        if todayWindow != window { today = NutritionValues(); todayEvents = []; todayWindow = window }
         let token = UUID()
         refreshID = token
         isLoading = true
@@ -64,11 +66,14 @@ final class HealthKitManager {
             let limits = try await client.limitedReadDates()
             let grouped = try HealthAggregation.events(records, ownBundle: client.ownBundleIdentifier)
             let history = try HealthAggregation.historyDays(records, events: grouped)
-            let daily = try HealthAggregation.totals(records.filter { DateWindows.contains($0.date, in: window) })
+            let dailySamples = records.filter { DateWindows.contains($0.date, in: window) }
+            let daily = try HealthAggregation.totals(dailySamples)
+            let dailyEvents = try HealthAggregation.events(dailySamples, ownBundle: client.ownBundleIdentifier,
+                                                           unnamedExternal: "Unnamed nutrition entry")
             let trend = try HealthAggregation.caffeineDays(records, count: 7, now: now)
             // A stale foreground refresh must not overwrite a newer post-save response.
             guard refreshID == token else { return }
-            samples = records; events = grouped; historyDays = history; today = daily; caffeineDays = trend
+            samples = records; events = grouped; historyDays = history; today = daily; todayEvents = dailyEvents; caffeineDays = trend
             limitedDates = limits; queryError = nil; lastRefreshed = now
         } catch {
             guard refreshID == token else { return }

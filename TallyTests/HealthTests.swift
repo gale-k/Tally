@@ -121,6 +121,24 @@ final class HealthTests: XCTestCase {
         XCTAssertEqual(event.nutrition.calories, 220)
         XCTAssertEqual(event.nutrition.caffeine, 100)
     }
+    // A nutrient drill-down must reconcile with the same day's samples without merging other apps.
+    func testDailyContributionGroupingAndEstimates() throws {
+        let now = Date.now
+        var estimated = record(.sugar, 3, now, "own", "food")
+        estimated.isEstimated = true
+        var unnamed = record(.sugar, 4, now, "other", "food")
+        unnamed.drinkName = nil
+        let named = record(.sugar, 5, now, "other", "food")
+        let records = [estimated, record(.calories, 100, now, "own", "food"), unnamed, named,
+                       record(.sugar, 0, now, "own", "zero")]
+        let events = try HealthAggregation.events(records, ownBundle: "own", unnamedExternal: "Unnamed nutrition entry")
+        let positive = events.filter { ($0.nutrition.sugar ?? 0) > 0 }
+        XCTAssertEqual(positive.count, 3)
+        XCTAssertEqual(positive.compactMap { $0.nutrition.sugar }.reduce(0, +), try HealthAggregation.totals(records).sugar)
+        XCTAssertTrue(try XCTUnwrap(positive.first(where: \.isFromTally)).nutrition.estimated.contains(.sugar))
+        XCTAssertEqual(positive.filter { $0.name == "Unnamed nutrition entry" }.count, 1)
+        XCTAssertEqual(positive.filter { $0.name == "Coffee" && !$0.isFromTally }.count, 1)
+    }
     private func record(_ nutrient: Nutrient, _ value: Double, _ date: Date, _ bundle: String = "own", _ event: String? = nil) -> HealthSample {
         .init(id: UUID(), nutrient: nutrient, value: value, date: date, sourceName: bundle, sourceBundle: bundle,
               eventID: event, drinkName: "Coffee", isEstimated: false)

@@ -116,18 +116,22 @@ final class DailyIntakeTests: XCTestCase {
         await manager.refresh(now: date.addingTimeInterval(60))
         XCTAssertEqual(manager.today.protein, 25)
         XCTAssertTrue(manager.today.estimated.contains(.protein))
+        XCTAssertEqual(manager.todayEvents.count, 1)
         store.queryError = HealthAccessError.unavailable
         await manager.refresh(now: date.addingTimeInterval(120))
         XCTAssertEqual(manager.today.protein, 25)
+        XCTAssertEqual(manager.todayEvents.count, 1)
         XCTAssertNotNil(manager.queryError)
         let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: date)!
         await manager.refresh(now: tomorrow)
         XCTAssertNil(manager.today.protein)
+        XCTAssertTrue(manager.todayEvents.isEmpty)
         XCTAssertNotNil(manager.queryError)
         store.queryError = nil
         store.saved.append(.init(name: "Zero", nutrition: .init(protein: 0), date: tomorrow))
         await manager.refresh(now: tomorrow.addingTimeInterval(60))
         XCTAssertEqual(manager.today.protein, 0)
+        XCTAssertEqual(manager.todayEvents.count, 1)
         XCTAssertNil(manager.queryError)
     }
 

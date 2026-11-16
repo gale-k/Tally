@@ -30,13 +30,13 @@ struct TodayView: View {
                 if showCalories || showProtein || showSugar || showCaffeine || showSodium {
                     Text("Nutrition Today").font(.title2.weight(.semibold))
                     VStack(spacing: 12) {
-                        if showCalories { SecondaryNutritionCard(nutrient: .calories, nutrition: health.today) }
+                        if showCalories { NutrientContributionLink(nutrient: .calories, nutrition: health.today) }
                         if showProtein || showSugar || showCaffeine || showSodium {
                             LazyVGrid(columns: columns, spacing: 12) {
-                                if showProtein { SecondaryNutritionCard(nutrient: .protein, nutrition: health.today, fillRow: true, alignedStatusHeight: alignedStatusHeight) }
-                                if showSugar { SecondaryNutritionCard(nutrient: .sugar, nutrition: health.today, fillRow: true, alignedStatusHeight: alignedStatusHeight) }
-                                if showCaffeine { CaffeineSummaryCard(nutrition: health.today, fillRow: true, alignedStatusHeight: alignedStatusHeight) }
-                                if showSodium { SecondaryNutritionCard(nutrient: .sodium, nutrition: health.today, fillRow: true, alignedStatusHeight: alignedStatusHeight) }
+                                if showProtein { NutrientContributionLink(nutrient: .protein, nutrition: health.today, fillRow: true, alignedStatusHeight: alignedStatusHeight) }
+                                if showSugar { NutrientContributionLink(nutrient: .sugar, nutrition: health.today, fillRow: true, alignedStatusHeight: alignedStatusHeight) }
+                                if showCaffeine { NutrientContributionLink(nutrient: .caffeine, nutrition: health.today, fillRow: true, alignedStatusHeight: alignedStatusHeight) }
+                                if showSodium { NutrientContributionLink(nutrient: .sodium, nutrition: health.today, fillRow: true, alignedStatusHeight: alignedStatusHeight) }
                             }
                             .onPreferenceChange(NutritionStatusHeightKey.self) { nutritionStatusHeight = $0 }
                         }
