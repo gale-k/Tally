@@ -104,6 +104,35 @@ final class TallyUITests: XCTestCase {
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "~100 mg caffeine")).firstMatch.exists)
     }
 
+    /// Exercise archive browsing, editing and restoration at standard and accessibility text sizes.
+    func testArchiveAndRestore() throws { try verifyArchive() }
+    func testArchiveAndRestoreWithLargeText() throws { try verifyArchive(["--large-text"]) }
+    private func verifyArchive(_ arguments: [String] = []) throws {
+        let app = launch(["--seed-library"] + arguments)
+        app.tabBars.buttons["Library"].tap()
+        let item = app.buttons["drink.Iced Mocha"]
+        reveal(item, in: app)
+        app.buttons["More actions for Iced Mocha"].tap()
+        app.buttons["Archive Item"].tap()
+        XCTAssertTrue(item.waitForNonExistence(timeout: 5))
+        // The large-text list may have scrolled the selector offscreen while revealing the item.
+        for _ in 0..<6 where !app.buttons["Archived"].exists { app.swipeDown() }
+        app.buttons["Archived"].tap()
+        XCTAssertTrue(item.waitForExistence(timeout: 5))
+        // The archived row opens the existing editor; a normal save must retain archive state.
+        item.tap()
+        XCTAssertTrue(app.textFields["drinkName"].waitForExistence(timeout: 5))
+        app.buttons["saveDrink"].tap()
+        XCTAssertTrue(item.waitForExistence(timeout: 5))
+        try app.performAccessibilityAudit(for: [.sufficientElementDescription])
+        app.buttons["More actions for Iced Mocha"].tap()
+        app.buttons["Unarchive Item"].tap()
+        XCTAssertTrue(item.waitForNonExistence(timeout: 5))
+        app.buttons["Active"].tap()
+        reveal(item, in: app)
+        XCTAssertTrue(item.waitForExistence(timeout: 5))
+    }
+
     func testQuickAddCanLogCaffeineOnlyAndSaveReusableDrink() {
         let app = launch()
         app.tabBars.buttons["Library"].tap()

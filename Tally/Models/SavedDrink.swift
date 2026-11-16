@@ -77,6 +77,8 @@ final class SavedDrink {
     var estimatedNutrients: [String]
     var notes: String?
     var isFavourite: Bool
+    // Optional storage allows existing SwiftData stores to migrate with active items.
+    var archivedState: Bool?
     var createdAt: Date
     var updatedAt: Date
     var lastLoggedAt: Date?
@@ -112,6 +114,11 @@ final class SavedDrink {
         self.timesLogged = timesLogged
     }
 
+    // Missing legacy values are active; writes use an explicit state.
+    var isArchived: Bool {
+        get { archivedState ?? false }
+        set { archivedState = newValue }
+    }
     var category: DrinkCategory { DrinkCategory(rawValue: categoryRaw) ?? .other }
     var servingStyle: ServingStyle { ServingStyle(rawValue: servingStyleRaw) ?? .other }
     var nutrition: NutritionValues {
