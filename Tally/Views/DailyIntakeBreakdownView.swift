@@ -20,7 +20,7 @@ struct DailyIntakeBreakdownView: View {
                 Text("Differences use visible totals only. Missing or restricted data cannot establish a remaining allowance.")
                     .font(.caption).foregroundStyle(.secondary)
                 ForEach(DailyIntakeReference.all) { reference in
-                    SecondaryNutritionCard(nutrient: reference.nutrient, nutrition: health.today)
+                    NutrientContributionLink(nutrient: reference.nutrient, nutrition: health.today)
                 }
                 NavigationLink("Edit Daily Intake Settings") { DailyIntakeSettingsView() }
             }.padding(20)

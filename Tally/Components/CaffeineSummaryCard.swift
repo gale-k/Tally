@@ -1,13 +1,5 @@
 import SwiftUI
 
-/// Caffeine shares the same comparison and optional-value behaviour as the other dashboard cards.
-struct CaffeineSummaryCard: View {
-    let nutrition: NutritionValues
-    var fillRow = false
-    var alignedStatusHeight: CGFloat?
-    var body: some View { SecondaryNutritionCard(nutrient: .caffeine, nutrition: nutrition, fillRow: fillRow, alignedStatusHeight: alignedStatusHeight) }
-}
-
 /// The largest status reserves enough space for every card without truncating dynamic text.
 struct NutritionStatusHeightKey: PreferenceKey {
     static let defaultValue: CGFloat = 0
@@ -23,7 +15,12 @@ struct SecondaryNutritionCard: View {
     var alignedStatusHeight: CGFloat?
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(nutrient == .sugar ? "Total Sugars" : nutrient.title).font(.subheadline).foregroundStyle(.secondary)
+            // A chevron makes the new contribution page discoverable without changing the card's content.
+            HStack {
+                Text(nutrient == .sugar ? "Total Sugars" : nutrient.title)
+                Spacer(minLength: 4)
+                Image(systemName: "chevron.right").font(.caption.weight(.semibold)).accessibilityHidden(true)
+            }.font(.subheadline).foregroundStyle(.secondary)
             Text(nutrition.formatted(nutrient) ?? "— \(nutrient.unit)")
                 .font(.title3.weight(.semibold)).monospacedDigit()
                 .accessibilityLabel(amountLabel)

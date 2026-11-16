@@ -484,6 +484,35 @@ final class TallyUITests: XCTestCase {
         XCTAssertTrue(app.buttons["drink.Iced Mocha"].label.contains("~100 mg caffeine"))
     }
 
+    /// Both summary surfaces open the selected nutrient using the same synthetic Health snapshot.
+    func testNutrientContributionNavigation() {
+        let app = launch(["--populated-health"])
+        connectFixture(app)
+        app.buttons["nutrientContributions.calories"].tap()
+        XCTAssertTrue(app.navigationBars["Calories"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["contributionTotal"].label.contains("600 kcal"))
+        XCTAssertTrue(app.staticTexts["Iced Mocha"].exists)
+        XCTAssertTrue(app.staticTexts["Lunch Bowl"].exists)
+        app.navigationBars.buttons.firstMatch.tap()
+        reveal(app.buttons["dailyIntakeBreakdown"], in: app); app.buttons["dailyIntakeBreakdown"].tap()
+        let fibre = app.buttons["nutrientContributions.fibre"]
+        reveal(fibre, in: app); fibre.tap()
+        XCTAssertTrue(app.navigationBars["Fibre"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["contributionTotal"].label.contains("6 g"))
+        XCTAssertTrue(app.staticTexts["Lunch Bowl"].exists)
+    }
+
+    /// The contribution page remains navigable and described at accessibility text sizes.
+    func testNutrientContributionDarkLargeTextAccessibility() throws {
+        let app = launch(["--populated-health", "--dark-mode", "--large-text"])
+        connectFixture(app)
+        let calories = app.buttons["nutrientContributions.calories"]
+        reveal(calories, in: app); calories.tap()
+        XCTAssertTrue(app.navigationBars["Calories"].waitForExistence(timeout: 5))
+        capture("Nutrient-Contributions-Dark-LargeText", app)
+        try app.performAccessibilityAudit(for: [.sufficientElementDescription])
+    }
+
     /// A sodium card with extra detail shares aligned rows and the breakdown keeps its source note.
     func testNutritionCardRowsAndSourceNote() {
         let app = launch(["--populated-health", "--populated-sodium", "--dark-mode"])

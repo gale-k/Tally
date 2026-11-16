@@ -87,7 +87,7 @@ enum HealthAggregation {
         return result
     }
 
-    static func events(_ samples: [HealthSample], ownBundle: String) throws -> [ConsumptionEvent] {
+    static func events(_ samples: [HealthSample], ownBundle: String, unnamedExternal: String? = nil) throws -> [ConsumptionEvent] {
         let groups = Dictionary(grouping: samples) { sample in
             // Never combine another app's samples by time, nor trust copied Tally metadata from another source.
             guard sample.sourceBundle == ownBundle else { return "sample:\(sample.id.uuidString)" }
@@ -98,8 +98,10 @@ enum HealthAggregation {
             let ordered = records.sorted { $0.id.uuidString < $1.id.uuidString }
             let first = ordered[0]
             let own = first.sourceBundle == ownBundle
+            // Preserve existing History labels; the drill-down also treats blank metadata as unnamed.
+            let name = unnamedExternal == nil ? first.drinkName : first.drinkName?.trimmingCharacters(in: .whitespacesAndNewlines)
             return ConsumptionEvent(id: key, date: first.date,
-                                    name: first.drinkName ?? (own ? "Nutrition entry" : first.nutrient.title),
+                                    name: (unnamedExternal == nil ? name : (name?.isEmpty == false ? name : nil)) ?? (own ? "Nutrition entry" : unnamedExternal ?? first.nutrient.title),
                                     brand: own ? first.brand : nil, size: own ? first.size : nil,
                                     sourceName: first.sourceName, isFromTally: own, nutrition: try totals(records))
         }.sorted { $0.date == $1.date ? $0.id < $1.id : $0.date > $1.date }
