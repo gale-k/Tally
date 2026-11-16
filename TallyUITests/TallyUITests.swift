@@ -455,6 +455,24 @@ final class TallyUITests: XCTestCase {
         XCTAssertTrue(app.buttons["drink.Iced Mocha"].label.contains("~100 mg caffeine"))
     }
 
+    /// A sodium card with extra detail shares aligned rows and the breakdown keeps its source note.
+    func testNutritionCardRowsAndSourceNote() {
+        let app = launch(["--populated-health", "--populated-sodium", "--dark-mode"])
+        connectFixture(app)
+        app.tabBars.buttons["Settings"].tap()
+        let sodium = app.switches["Show Sodium"]
+        sodium.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+        app.tabBars.buttons["Today"].tap()
+        XCTAssertTrue(app.staticTexts["Sodium"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Daily target")).firstMatch.exists)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Daily maximum")).firstMatch.exists)
+        capture("Today-Nutrition-Row-Alignment", app)
+        let breakdown = app.buttons["dailyIntakeBreakdown"]
+        reveal(breakdown, in: app); breakdown.tap()
+        XCTAssertTrue(app.staticTexts["Visible Apple Health nutrition · all sources"].waitForExistence(timeout: 5))
+        capture("Daily-Intake-Source-Note", app)
+    }
+
     /// The upgrade retains both the original caffeine amount and existing dashboard visibility choices.
     func testDailyIntakePreservesLegacyCaffeineAndVisibility() {
         let app = launch(["--legacy-daily-settings", "--populated-health"])
@@ -476,6 +494,33 @@ final class TallyUITests: XCTestCase {
         reveal(app.buttons["dailyIntakeBreakdown"], in: app); app.buttons["dailyIntakeBreakdown"].tap()
         XCTAssertTrue(app.staticTexts["Total Sugars"].exists)
         capture("Daily-Intake-Breakdown", app)
+    }
+
+    /// One sodium maximum can be edited in salt and shown on the optional sodium card.
+    func testSodiumDailyMaximumCanBeEditedAsSalt() {
+        let app = launch()
+        app.tabBars.buttons["Settings"].tap()
+        app.switches["Show Sodium"].coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+        app.buttons["dailyIntakeSettings"].tap()
+        let sodium = app.buttons["dailyIntake.sodium"]
+        reveal(sodium, in: app); sodium.tap()
+        let unit = app.buttons["dailySodiumUnit"]
+        reveal(unit, in: app); unit.tap(); app.buttons["Salt (g)"].tap()
+        let field = app.textFields["dailyIntakeValue"]
+        XCTAssertEqual(field.value as? String, "6")
+        replace(field, with: "5"); app.buttons["saveDailyIntake"].tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "2,000 mg")).firstMatch.exists)
+        app.tabBars.buttons["Library"].tap(); app.buttons["Quick Add"].tap()
+        let more = app.buttons["More Nutrition"]
+        reveal(more, in: app); more.tap()
+        let amount = app.textFields["nutrition.sodium"]
+        reveal(amount, in: app); amount.tap(); amount.typeText("1000")
+        let log = app.buttons["quickLogToHealth"]
+        reveal(log, in: app); log.tap()
+        XCTAssertTrue(log.waitForNonExistence(timeout: 10))
+        app.tabBars.buttons["Today"].tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "50%")).firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "5 g salt")).firstMatch.exists)
     }
 
     /// A visible zero is measured data and must show 0% rather than the unknown-data state.
@@ -513,16 +558,17 @@ final class TallyUITests: XCTestCase {
         try app.performAccessibilityAudit(for: [.sufficientElementDescription])
         XCTAssertTrue(app.navigationBars["Daily Intake"].waitForExistence(timeout: 5))
         capture("Daily-Intake-Dark-LargeText", app)
-        let progress = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "to reference")).firstMatch
+        let progress = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "to target")).firstMatch
         reveal(progress, in: app)
         app.swipeUp()
         capture("Daily-Intake-Card-Dark-LargeText", app)
         app.tabBars.buttons["Settings"].tap()
         reveal(app.buttons["dailyIntakeSettings"], in: app); app.buttons["dailyIntakeSettings"].tap()
         capture("Daily-Intake-Settings-Dark-LargeText", app)
-        for nutrient in ["calories", "protein", "sugar", "caffeine", "carbohydrates", "totalFat", "saturatedFat", "fibre"] {
+        for nutrient in ["calories", "protein", "sugar", "caffeine", "carbohydrates", "totalFat", "saturatedFat", "fibre", "sodium"] {
             reveal(app.buttons["dailyIntake." + nutrient], in: app)
         }
+        reveal(app.buttons["dailyIntake.fibre"], in: app)
         app.buttons["dailyIntake.fibre"].tap()
         capture("Daily-Intake-Editor-Dark-LargeText", app)
         try app.performAccessibilityAudit(for: [.sufficientElementDescription])

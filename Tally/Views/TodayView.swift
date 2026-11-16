@@ -14,6 +14,7 @@ struct TodayView: View {
     // This preference affects presentation only; sodium is always available for entry and history.
     @AppStorage("showSodium") private var showSodium = false
     @State private var sheet: DrinkSheet?
+    @State private var nutritionStatusHeight: CGFloat = 0
     let openLibrary: () -> Void
     private var columns: [GridItem] { [GridItem(.adaptive(minimum: typeSize.isAccessibilitySize ? 280 : 155), spacing: 12)] }
 
@@ -24,15 +25,20 @@ struct TodayView: View {
                     // The date sits directly on the grouped background; primary text keeps its contrast sufficient.
                     .font(.subheadline).foregroundStyle(.primary)
                 if !health.permissionsRequested || !health.isAvailable { HealthAccessCard() }
-                // Equal-weight cards avoid treating caffeine as a required part of every diet entry.
+                // Calories span the grid width; the remaining cards keep their adaptive layout.
                 if showCalories || showProtein || showSugar || showCaffeine || showSodium {
                     Text("Nutrition Today").font(.title2.weight(.semibold))
-                    LazyVGrid(columns: columns, spacing: 12) {
+                    VStack(spacing: 12) {
                         if showCalories { SecondaryNutritionCard(nutrient: .calories, nutrition: health.today) }
-                        if showProtein { SecondaryNutritionCard(nutrient: .protein, nutrition: health.today) }
-                        if showSugar { SecondaryNutritionCard(nutrient: .sugar, nutrition: health.today) }
-                        if showCaffeine { CaffeineSummaryCard(nutrition: health.today) }
-                        if showSodium { SecondaryNutritionCard(nutrient: .sodium, nutrition: health.today) }
+                        if showProtein || showSugar || showCaffeine || showSodium {
+                            LazyVGrid(columns: columns, spacing: 12) {
+                                if showProtein { SecondaryNutritionCard(nutrient: .protein, nutrition: health.today, fillRow: true, alignedStatusHeight: alignedStatusHeight) }
+                                if showSugar { SecondaryNutritionCard(nutrient: .sugar, nutrition: health.today, fillRow: true, alignedStatusHeight: alignedStatusHeight) }
+                                if showCaffeine { CaffeineSummaryCard(nutrition: health.today, fillRow: true, alignedStatusHeight: alignedStatusHeight) }
+                                if showSodium { SecondaryNutritionCard(nutrient: .sodium, nutrition: health.today, fillRow: true, alignedStatusHeight: alignedStatusHeight) }
+                            }
+                            .onPreferenceChange(NutritionStatusHeightKey.self) { nutritionStatusHeight = $0 }
+                        }
                     }
                 }
                 // The breakdown remains accessible even when every dashboard card is hidden.
@@ -88,4 +94,7 @@ struct TodayView: View {
         .refreshable { await health.refresh() }
         .drinkSheets($sheet)
     }
+
+    // Single-column accessibility layouts do not need cross-card spacing.
+    private var alignedStatusHeight: CGFloat? { typeSize.isAccessibilitySize ? nil : nutritionStatusHeight }
 }

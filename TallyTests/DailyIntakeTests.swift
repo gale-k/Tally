@@ -5,17 +5,18 @@ import SwiftUI
 /// Comparison tests deliberately include absent data, real zeroes, custom goals, and over-100% totals.
 final class DailyIntakeTests: XCTestCase {
     func testAdultPresetAndMeanings() throws {
-        XCTAssertEqual(DailyIntakeReference.all.count, 8)
+        XCTAssertEqual(DailyIntakeReference.all.count, 9)
         let expected: [Nutrient: Double] = [.calories: 2_000, .protein: 50, .sugar: 90, .caffeine: 400,
-                                           .carbohydrates: 260, .totalFat: 70, .saturatedFat: 20, .fibre: 30]
+                                           .carbohydrates: 260, .totalFat: 70, .saturatedFat: 20, .fibre: 30, .sodium: 2_400]
         for reference in DailyIntakeReference.all {
             XCTAssertEqual(reference.defaultValue, expected[reference.nutrient])
             XCTAssertTrue(reference.isValid(reference.defaultValue))
-            XCTAssertEqual(reference.label(for: reference.defaultValue / 2), "Personal target")
+            XCTAssertEqual(reference.label(for: reference.defaultValue), reference.isMaximum ? "Daily maximum" : "Daily target")
+            XCTAssertEqual(reference.label(for: reference.defaultValue / 2), reference.isMaximum ? "Daily maximum" : "Daily target")
         }
         XCTAssertEqual(try reference(.sugar).title, "Total Sugars")
-        XCTAssertEqual(try reference(.protein).label(for: 50), "Adult reference intake")
-        XCTAssertEqual(try reference(.fibre).label(for: 30), "Adult daily goal")
+        XCTAssertEqual(try reference(.protein).label(for: 50), "Daily target")
+        XCTAssertEqual(try reference(.fibre).label(for: 30), "Daily target")
         XCTAssertEqual(try reference(.caffeine).valueKey, "dailyCaffeineTarget")
     }
 
@@ -24,14 +25,14 @@ final class DailyIntakeTests: XCTestCase {
         let below = try XCTUnwrap(DailyIntakeProgress(consumed: 500, target: 2_000))
         XCTAssertEqual(below.percentage, 25)
         XCTAssertEqual(below.difference, 1_500)
-        XCTAssertTrue(below.status(for: reference).contains("to reference"))
+        XCTAssertTrue(below.status(for: reference).contains("to target"))
         let equal = try XCTUnwrap(DailyIntakeProgress(consumed: 2_000, target: 2_000))
-        XCTAssertEqual(equal.status(for: reference), "At reference intake")
+        XCTAssertEqual(equal.status(for: reference), "Target met")
         let above = try XCTUnwrap(DailyIntakeProgress(consumed: 3_000, target: 2_000))
         XCTAssertEqual(above.percentage, 150)
         XCTAssertEqual(above.fraction, 1)
         XCTAssertEqual(above.difference, 1_000)
-        XCTAssertTrue(above.status(for: reference).contains("above reference"))
+        XCTAssertTrue(above.status(for: reference).contains("above target"))
         XCTAssertEqual(DailyIntakeProgress(consumed: 0, target: 2_000)?.percentage, 0)
         XCTAssertNil(DailyIntakeProgress(consumed: nil, target: 2_000))
     }
@@ -48,7 +49,24 @@ final class DailyIntakeTests: XCTestCase {
             }
         }
         let caffeine = try reference(.caffeine)
-        XCTAssertTrue(try XCTUnwrap(DailyIntakeProgress(consumed: 500, target: 400)).status(for: caffeine).contains("over personal target"))
+        XCTAssertEqual(DailyIntakeProgress(consumed: 200, target: 400)?.status(for: caffeine), "200 mg to daily maximum")
+        XCTAssertEqual(DailyIntakeProgress(consumed: 400, target: 400)?.status(for: caffeine), "At daily maximum")
+        XCTAssertTrue(try XCTUnwrap(DailyIntakeProgress(consumed: 500, target: 400)).status(for: caffeine).contains("over daily maximum"))
+    }
+
+    // Salt and sodium share a single persisted comparison and the same finite validation.
+    func testSodiumMaximumAndSaltConversion() throws {
+        let sodium = try reference(.sodium)
+        XCTAssertEqual(sodium.defaultValue, 2_400)
+        XCTAssertEqual(sodium.saltEquivalent(2_400), "6 g salt")
+        XCTAssertEqual(try sodium.parse("6", locale: Locale(identifier: "en_GB"), sodiumUnit: .salt), 2_400)
+        XCTAssertEqual(try sodium.parse("1,5", locale: Locale(identifier: "fr_FR"), sodiumUnit: .salt), 600)
+        XCTAssertThrowsError(try sodium.parse("0", sodiumUnit: .salt))
+        XCTAssertThrowsError(try sodium.parse("26", sodiumUnit: .salt))
+        XCTAssertEqual(DailyIntakeProgress(consumed: 3_000, target: 2_400)?.status(for: sodium), "600 mg over daily maximum")
+        for nutrient in [Nutrient.sugar, .totalFat, .saturatedFat, .caffeine, .sodium] {
+            XCTAssertTrue(try reference(nutrient).label(for: reference(nutrient).defaultValue).lowercased().contains("maximum"))
+        }
     }
 
     func testMalformedTargetsAndLocale() throws {

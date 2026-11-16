@@ -14,6 +14,9 @@ struct DailyIntakeBreakdownView: View {
                     Button("Try Again") { Task { await health.refresh() } }
                 }
                 HealthReadNote()
+                // Short card labels describe tracking choices; defaults are not personalised medical limits.
+                Text("Targets and maximums are tracking comparisons. Adult defaults are general starting points, not personalised advice or universal safe limits.")
+                    .font(.caption).foregroundStyle(.secondary)
                 Text("Differences use visible totals only. Missing or restricted data cannot establish a remaining allowance.")
                     .font(.caption).foregroundStyle(.secondary)
                 ForEach(DailyIntakeReference.all) { reference in

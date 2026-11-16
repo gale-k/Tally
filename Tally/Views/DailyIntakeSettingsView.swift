@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Native navigation keeps eight editable comparisons compact and usable with larger text.
+/// Native navigation keeps nine editable comparisons compact and usable with larger text.
 struct DailyIntakeSettingsView: View {
     var body: some View {
         Form {
@@ -33,6 +33,7 @@ private struct DailyIntakeSettingRow: View {
                 Text(reference.title)
                 Text(enabled ? "\(value.formatted()) \(reference.nutrient.unit) · \(reference.label(for: value))" : "Comparison off")
                     .font(.caption).foregroundStyle(.secondary)
+                if enabled && reference.nutrient == .sodium { Text("Equivalent to \(reference.saltEquivalent(value))").font(.caption).foregroundStyle(.secondary) }
             }
         }.accessibilityIdentifier("dailyIntake.\(reference.nutrient.rawValue)")
     }
@@ -46,24 +47,32 @@ private struct DailyIntakeEditor: View {
     @State private var text = ""
     @State private var error: String?
     @State private var saved = false
+    @State private var sodiumUnit: SodiumInputUnit = .sodium
     @FocusState private var editing: Bool
     var body: some View {
         Form {
             Section {
                 Toggle("Show daily comparison", isOn: $enabled).accessibilityIdentifier("comparisonEnabled")
+                if reference.nutrient == .sodium {
+                    // Convert the current draft on unit changes; invalid drafts remain untouched for correction.
+                    Picker("Enter as", selection: Binding(get: { sodiumUnit }, set: { newUnit in changeUnit(to: newUnit) })) {
+                        ForEach(SodiumInputUnit.allCases) { unit in Text("\(unit.title) (\(unit.unit))").tag(unit) }
+                    }.accessibilityIdentifier("dailySodiumUnit")
+                }
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Daily value (\(reference.nutrient.unit))")
+                    Text("Daily value (\(displayUnit))")
                     TextField("Daily value", text: $text).keyboardType(.decimalPad).focused($editing)
-                        .accessibilityLabel("\(reference.title) daily value, \(reference.nutrient.unit)")
+                        .accessibilityLabel("\(reference.title) daily value, \(displayUnit)")
                         .accessibilityIdentifier("dailyIntakeValue")
                         .onChange(of: text) { _, _ in saved = false }
                 }
                 Button("Save Value") {
-                    do { value = try reference.parse(text); error = nil; saved = true; editing = false }
+                    do { value = try reference.parse(text, sodiumUnit: sodiumUnit); error = nil; saved = true; editing = false }
                     catch { self.error = error.localizedDescription; saved = false }
                 }.accessibilityIdentifier("saveDailyIntake")
                 if let error { Text(error).foregroundStyle(.primary).accessibilityIdentifier("dailyIntakeError") }
                 if saved { Label("Value saved", systemImage: "checkmark.circle") }
+                if reference.nutrient == .sodium { Text("Saved equivalent: \(reference.saltEquivalent(value))").font(.caption) }
                 Button("Reset to Adult Default") {
                     value = reference.defaultValue; enabled = true
                     text = formattedValue; error = nil; saved = true; editing = false
@@ -78,8 +87,18 @@ private struct DailyIntakeEditor: View {
         .onAppear { text = formattedValue }
         .scrollDismissesKeyboard(.interactively)
     }
+    private var displayUnit: String { reference.nutrient == .sodium ? sodiumUnit.unit : reference.nutrient.unit }
+    private func changeUnit(to unit: SodiumInputUnit) {
+        guard unit != sodiumUnit else { return }
+        do {
+            let canonical = try reference.parse(text, sodiumUnit: sodiumUnit)
+            sodiumUnit = unit
+            text = (canonical / unit.sodiumMultiplier).formatted(.number.grouping(.never).precision(.significantDigits(1...15)))
+            error = nil
+        } catch { self.error = error.localizedDescription }
+    }
     private var formattedValue: String {
-        value.formatted(.number.grouping(.never).precision(.significantDigits(1...15)))
+        (value / (reference.nutrient == .sodium ? sodiumUnit.sodiumMultiplier : 1)).formatted(.number.grouping(.never).precision(.significantDigits(1...15)))
     }
 }
 
@@ -87,9 +106,11 @@ private struct DailyIntakeEditor: View {
 struct DailyIntakeGuidance: View {
     var body: some View {
         Section("About the Comparisons") {
-            Text("Food-label reference intakes are comparisons, not universal recommended amounts or safe maximums. Protein and fibre are not upper limits. Edited values are personal tracking targets.")
+            Text("Daily targets and maximums are tracking comparisons, not personalised advice. Food-label defaults are general adult references, not universal targets or safe maximums. Sugar and fat maximums are tracking choices based on those references. Protein and fibre are not upper limits.")
             Text("Total sugars includes naturally occurring sugars. Tally cannot separate free sugars; the NHS 30 g free-sugars guidance is not a limit for this total.")
-            Text("The 400 mg caffeine starting value reflects general healthy-adult daily guidance. It is not suitable for everyone; pregnancy and breastfeeding have different guidance. Your saved caffeine target is retained.")
+            Text("The 400 mg caffeine starting value reflects general healthy-adult daily guidance. It is not suitable for everyone; pregnancy and breastfeeding have different guidance. Your saved caffeine value is retained.")
+            Text("The adult sodium maximum starts at 2,400 mg, equivalent to 6 g salt. Individual needs vary.")
+            Link("Food Standards Scotland · Salt and sodium", destination: URL(string: "https://www.foodstandards.gov.scot/consumer-advice/healthy-eating/balanced-diet/understanding-nutrients/salt")!)
             Link("NHS Scotland · Adult reference intakes", destination: URL(string: "https://mydiabetesmyway.scot.nhs.uk/resources/internal/food-labels/#reference-intakes")!)
             Link("Food Standards Scotland · Fibre", destination: URL(string: "https://www.foodstandards.gov.scot/consumer-advice/healthy-eating/balanced-diet/understanding-nutrients/fibre")!)
             Link("EFSA · Caffeine guidance", destination: URL(string: "https://www.efsa.europa.eu/en/topics/topic/caffeine")!)

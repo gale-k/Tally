@@ -33,6 +33,10 @@ final class FixtureNutritionStore: NutritionStore {
                 .init(name: "Lunch Bowl", nutrition: .init(calories: 380, carbohydrates: 42, protein: 24, fibre: 6, estimated: [.calories]), date: start.addingTimeInterval(90)),
                 .init(name: "Grande Caffè Latte", brand: "Starbucks", nutrition: .init(caffeine: 125), date: start.addingTimeInterval(120))
             ]
+            // Opt-in sodium gives the layout test a visible bar without altering other fixtures.
+            if ProcessInfo.processInfo.arguments.contains("--populated-sodium") {
+                events.append(.init(name: "Soup", nutrition: .init(sodium: 800), date: start.addingTimeInterval(150)))
+            }
             for offset in 1...6 {
                 let date = Calendar.current.date(byAdding: .day, value: -offset, to: start)!.addingTimeInterval(3_600)
                 events.append(.init(name: "Coffee", nutrition: .init(caffeine: Double(100 + offset * 20)), date: date))

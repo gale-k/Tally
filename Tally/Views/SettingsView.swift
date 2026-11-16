@@ -41,7 +41,7 @@ struct SettingsView: View {
             Section {
                 NavigationLink("Daily Intake") { DailyIntakeSettingsView() }
                     .accessibilityIdentifier("dailyIntakeSettings")
-            } footer: { Text("Adult references and personal targets for eight nutrients. Edit or turn off each daily comparison.") }
+            } footer: { Text("Adult references and personal targets or maximums for nine nutrients. Edit or turn off each daily comparison.") }
             Section {
                 LabeledContent("Health data", value: health.isAvailable ? "Available" : "Unavailable")
                 LabeledContent("Permissions requested", value: health.permissionsRequested ? "Yes" : "Not yet")
