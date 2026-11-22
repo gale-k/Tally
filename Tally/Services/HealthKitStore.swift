@@ -89,9 +89,8 @@ final class HealthKitStore: NutritionStore {
         })
     }
 
-    func samples(in range: DateInterval) async throws -> [HealthSample] {
+    func samples(in range: DateInterval, limitedBy limits: [Nutrient: Date]) async throws -> [HealthSample] {
         guard isAvailable else { throw HealthAccessError.unavailable }
-        let limits = try await limitedReadDates()
         var records: [HealthSample] = []
         for nutrient in Nutrient.allCases {
             let start = max(range.start, limits[nutrient] ?? range.start)

@@ -23,8 +23,13 @@ final class FixtureNutritionStore: NutritionStore {
         guard denied.isEmpty else { throw HealthAccessError.writeDenied(denied.map(\.title)) }
         logged.append(event)
     }
-    func limitedReadDates() async throws -> [Nutrient: Date] { [:] }
-    func samples(in range: DateInterval) async throws -> [HealthSample] {
+    func limitedReadDates() async throws -> [Nutrient: Date] {
+        // The Trends fixture models a cutoff partway through the third previous day.
+        guard ProcessInfo.processInfo.arguments.contains("--trend-fixture") else { return [:] }
+        let day = DateWindows.dayStart(daysAgo: 3, now: .now, calendar: .current)
+        return [.sodium: day.addingTimeInterval(1_800)]
+    }
+    func samples(in range: DateInterval, limitedBy limits: [Nutrient: Date]) async throws -> [HealthSample] {
         if ProcessInfo.processInfo.arguments.contains("--query-failure") { throw HealthAccessError.invalidData }
         var events = logged
         if populated {
@@ -44,19 +49,37 @@ final class FixtureNutritionStore: NutritionStore {
                 events.append(.init(name: "Coffee", nutrition: .init(caffeine: Double(100 + offset * 20)), date: date))
             }
         }
-        return events.flatMap { event in
+        var samples = events.flatMap { event in
             event.nutrition.loggableNutrients.map { nutrient in
                 HealthSample(id: UUID(), nutrient: nutrient, value: event.nutrition[nutrient]!, date: event.date,
                              sourceName: "Tally", sourceBundle: ownBundleIdentifier, eventID: event.id.uuidString,
                              drinkName: event.name, brand: event.brand, size: event.size,
                              isEstimated: event.nutrition.estimated.contains(nutrient))
             }
-        }.filter { DateWindows.contains($0.date, in: range) }
+        }
+        if ProcessInfo.processInfo.arguments.contains("--trend-fixture") {
+            // Seed existing Health samples directly so the recorded zero bypasses new-entry validation.
+            let now = range.end
+            func makeSample(_ amount: Double, daysAgo: Int, name: String?, estimated: Bool = false) -> HealthSample {
+                let date = DateWindows.dayStart(daysAgo: daysAgo, now: now, calendar: .current).addingTimeInterval(3_600)
+                return HealthSample(id: UUID(), nutrient: .sodium, value: amount, date: date,
+                                    sourceName: name == nil ? "Other Nutrition" : "Tally",
+                                    sourceBundle: name == nil ? "example.nutrition" : ownBundleIdentifier,
+                                    drinkName: name, isEstimated: estimated)
+            }
+            samples += [makeSample(0, daysAgo: 1, name: "Plain water"),
+                        makeSample(300, daysAgo: 3, name: "Soup", estimated: true),
+                        makeSample(200, daysAgo: 3, name: nil)]
+        }
+        return samples.filter { DateWindows.contains($0.date, in: range) }
     }
 }
 
 /// Appearance overrides exist only for repeatable runtime screenshot tests; normal launches respect system settings.
 struct DevelopmentAppearance: ViewModifier {
+    // Apply one presentation preference so the outer appearance setting cannot mask a test override.
+    var appAppearance: AppAppearance? = nil
+
     func body(content: Content) -> some View {
         let args = ProcessInfo.processInfo.arguments
         if args.contains("--ui-testing") && !args.contains("--test-appearance-setting") {
@@ -64,6 +87,8 @@ struct DevelopmentAppearance: ViewModifier {
                 content.preferredColorScheme(args.contains("--dark-mode") ? .dark : .light)
                     .dynamicTypeSize(.accessibility3)
             } else { content.preferredColorScheme(args.contains("--dark-mode") ? .dark : .light) }
+        } else if let appAppearance {
+            content.preferredColorScheme(appAppearance.colorScheme)
         } else { content }
     }
 }

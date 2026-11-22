@@ -32,7 +32,9 @@ struct TallyApp: App {
         let usesTestData = uiTesting || ProcessInfo.processInfo.arguments.contains("--isolated-test-host")
         if uiTesting && !ProcessInfo.processInfo.arguments.contains("--preserve-preferences") {
             // UI-test presentation choices must not leak into the next test; normal device preferences are untouched.
-            for key in ["showCalories", "showProtein", "showSugar", "showCaffeine", "showSodium", "appearance"] { UserDefaults.standard.removeObject(forKey: key) }
+            for key in ["showCalories", "showProtein", "showSugar", "showCaffeine", "showSodium", "appearance", "trendNutrient"] {
+                UserDefaults.standard.removeObject(forKey: key)
+            }
             for reference in DailyIntakeReference.all {
                 UserDefaults.standard.removeObject(forKey: reference.valueKey)
                 UserDefaults.standard.removeObject(forKey: reference.enabledKey)
@@ -72,18 +74,18 @@ struct TallyApp: App {
         WindowGroup {
             Group {
                 if let container, let sync {
-                #if DEBUG
-                RootView().modelContainer(container).environment(health).environment(sync).tint(Color.accentColor).modifier(DevelopmentAppearance())
-                #else
-                RootView().modelContainer(container).environment(health).environment(sync).tint(Color.accentColor)
-                #endif
+                    RootView().modelContainer(container).environment(health).environment(sync).tint(Color.accentColor)
                 } else {
                     ContentUnavailableView("Your library couldn’t open", systemImage: "externaldrive.badge.exclamationmark",
                                            description: Text(startupError ?? "Please reopen Tally to try again. Your library has not been reset."))
                         .padding()
                 }
             }
+            #if DEBUG
+            .modifier(DevelopmentAppearance(appAppearance: appearance))
+            #else
             .preferredColorScheme(appearance.colorScheme)
+            #endif
         }
     }
 }

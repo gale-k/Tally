@@ -7,7 +7,8 @@ A native iPhone nutrition utility for saving your usual foods and drinks and log
 - Save reusable foods and drinks with favourites, brands, serving sizes, notes, and optional nutrition.
 - Find a saved item with search, category filters, five sort orders, and ranked Quick Log cards. Archive items you no longer use and restore them from the Library’s Archived view.
 - Review an item and its time before logging, or use Quick Add for a one-off entry.
-- Choose calorie, protein, sugar, caffeine, and sodium summaries on Today, with recent Health history and an optional seven-day caffeine chart.
+- Choose calorie, protein, sugar, caffeine, and sodium summaries on Today.
+- Open **History → Trends** for seven- or 30-day charts for every nutrient. Select a day to see its total and contributing Health entries.
 - Compare nine daily nutrient totals with editable adult references, personal targets, or maximums, with a full Daily Intake breakdown. Tap a nutrient card to see the visible entries contributing to today’s total.
 - Optionally sync saved templates through your private iCloud storage, with offline edits and explicit account-switch control.
 - Export independent JSON snapshots to Files/iCloud Drive; import missing items or restore older snapshots as new copies.
@@ -37,7 +38,7 @@ A name is the only required template field. Serving size is free text (for examp
 
 Calories, protein, sugar, and caffeine are immediately accessible in the editor. Carbohydrates, fats, fibre, and sodium/salt are under **More Nutrition**. Choose **Sodium (mg)** or **Salt (g)** to match the label; switching converts the entered amount. Salt uses the [food-label conversion](https://www.foodstandards.gov.scot/consumer-advice/healthy-eating/balanced-diet/understanding-nutrients/salt): 1 g salt = 400 mg sodium. Tally stores and logs one sodium value to Apple Health, and saved items reopen in sodium mg. First use requests any newly needed Health write permission.
 
-Cards show the known values that best describe each item, so a protein-only food never needs a caffeine placeholder. Configure the Today cards in **Settings → Nutrition on Today**; **Show Sodium** is off until enabled. Hiding caffeine also hides its weekly chart; the personal caffeine maximum remains available in Settings.
+Cards show the known values that best describe each item, so a protein-only food never needs a caffeine placeholder. Configure the Today cards in **Settings → Nutrition on Today**. **Show Sodium** is off until enabled. **View Trends** opens History from Today, and **View trend** on a contribution page opens the corresponding nutrient.
 
 Existing libraries and version-1 JSON exports continue to work. The internal `SavedDrink` type and the JSON `drinks` key retain their original names to preserve compatibility; exported files are now named **Tally Library**. Existing logged drink names and Apple Health metadata remain unchanged.
 
@@ -46,6 +47,8 @@ Existing libraries and version-1 JSON exports continue to work. The internal `Sa
 Reusable food and drink templates remain available in this device’s SwiftData store. Optional iCloud sync sends template details, including nutrition, notes, favourites, and archive state, to your private CloudKit database after confirmation in Settings. Actual consumption is saved as independent HealthKit samples and queried from Apple Health. Editing, archiving, or deleting a template never changes historical samples.
 
 Today’s totals and history show **visible Apple Health nutrition from all sources**, including other apps and foods. They are not presented as drinks-only totals. Empty results cannot establish whether read permission was denied. Limited-history access is respected. Nutrient breakdowns include visible entries from all sources; some may have no food name. Pull to refresh, or return to Tally after changing data or permissions in Health.
+
+**History → Trends** remembers your last nutrient on this device. The daily average uses completed days with visible amounts, including recorded zeroes. Gaps indicate missing visible data. Today's total is labelled **today so far** and is excluded from the average.
 
 Configure **Settings → Daily Intake** to edit, disable, or individually reset the UK Adult Reference Preset. Today shows the selected comparison, percentage, and difference; **Daily Intake Breakdown** includes all nine comparisons even when dashboard cards are hidden. Percentages continue beyond 100%. Protein and fibre do not become upper limits. Missing Health data never becomes a zero or a full remaining allowance, and estimated amounts retain `~`. Differences use visible totals only.
 

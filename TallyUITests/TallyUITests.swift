@@ -205,7 +205,7 @@ final class TallyUITests: XCTestCase {
         connectFixture(app)
         capture("Today-Light", app)
         app.swipeUp()
-        capture("QuickLog-And-Trend-Light", app)
+        capture("QuickLog-Light", app)
         app.tabBars.buttons["Library"].tap()
         capture("Library-Light", app)
         app.buttons["drink.Iced Mocha"].tap()
@@ -362,7 +362,7 @@ final class TallyUITests: XCTestCase {
     func testQuickAddSodiumCanAppearOnToday() {
         let app = launch()
         app.tabBars.buttons["Settings"].tap()
-        for title in ["Show Calories", "Show Protein", "Show Sugar", "Show Caffeine & Trend", "Show Sodium"] {
+        for title in ["Show Calories", "Show Protein", "Show Sugar", "Show Caffeine Card", "Show Sodium"] {
             let toggle = app.switches[title]
             toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
         }
@@ -387,7 +387,7 @@ final class TallyUITests: XCTestCase {
         let app = launch(["--seed-library", "--populated-health"])
         connectFixture(app)
         app.tabBars.buttons["Settings"].tap()
-        let caffeine = app.switches["Show Caffeine & Trend"]
+        let caffeine = app.switches["Show Caffeine Card"]
         caffeine.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
         XCTAssertEqual(caffeine.value as? String, "0")
         app.tabBars.buttons["Today"].tap()
@@ -531,6 +531,128 @@ final class TallyUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Calories"].waitForExistence(timeout: 5))
         capture("Nutrient-Contributions-Dark-LargeText", app)
         try app.performAccessibilityAudit(for: [.sufficientElementDescription])
+    }
+
+    // A hidden Today nutrient is selectable in History and retains its range and day after drill-down.
+    func testNutritionTrendsPersistsNutrientAndReconcilesDatedContributions() {
+        let app = launch(["--populated-health", "--trend-fixture"])
+        connectFixture(app)
+        app.tabBars.buttons["History"].tap()
+        XCTAssertTrue(app.staticTexts["Last 30 days"].waitForExistence(timeout: 5))
+        app.buttons["Trends"].tap()
+        let picker = app.buttons["trendNutrient"]
+        XCTAssertTrue(picker.waitForExistence(timeout: 5))
+        XCTAssertEqual(picker.value as? String, "Caffeine")
+        XCTAssertTrue(app.staticTexts["trendSelectedDate"].label.contains("today so far"))
+        picker.tap()
+        app.buttons["Sodium"].tap()
+        XCTAssertEqual(picker.value as? String, "Sodium")
+        let chart = app.descendants(matching: .any)["nutritionTrendChart"].firstMatch
+        XCTAssertTrue(chart.waitForExistence(timeout: 5))
+        // Tap yesterday's slot above the baseline to exercise chart selection separately from the day picker.
+        chart.coordinate(withNormalizedOffset: CGVector(dx: 0.82, dy: 0.45)).tap()
+        XCTAssertEqual(app.staticTexts["trendSelectedTotal"].label, "0 mg")
+        chart.coordinate(withNormalizedOffset: CGVector(dx: 0.35, dy: 0.45)).tap()
+        XCTAssertEqual(app.staticTexts["trendSelectedTotal"].label, "No visible data")
+        XCTAssertTrue(app.staticTexts["Outside the Apple Health read window."].exists)
+        let coverage = app.staticTexts["trendCoverage"]
+        reveal(coverage, in: app)
+        XCTAssertEqual(coverage.label, "2 of 6 completed days with data")
+        XCTAssertTrue(app.staticTexts["trendAverage"].label.contains("250 mg"))
+
+        selectTrendDay(containing: "~500 mg", spoken: "Approximately 500 mg", in: app)
+        let selectedDate = app.staticTexts["trendSelectedDate"].label
+        XCTAssertTrue(app.staticTexts["trendSelectedTotal"].label.contains("500 mg"))
+        XCTAssertTrue(app.staticTexts["Apple Health only shares part of this day."].exists)
+        let month = app.buttons["30 days"]
+        reveal(month, in: app)
+        month.tap()
+        XCTAssertEqual(app.staticTexts["trendSelectedDate"].label, selectedDate)
+        capture("Trends-Sodium-30-days-Light", app)
+        let contributions = app.buttons["viewTrendContributions"]
+        reveal(contributions, in: app)
+        contributions.tap()
+        XCTAssertTrue(app.navigationBars["Sodium"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["contributionTotal"].label.contains("500 mg"))
+        XCTAssertTrue(app.staticTexts["Soup"].exists)
+        XCTAssertTrue(app.staticTexts["Unnamed nutrition entry"].exists)
+        XCTAssertTrue(app.staticTexts["Other Nutrition"].exists)
+        capture("Trends-Dated-Contributions-Light", app)
+        app.navigationBars["Sodium"].buttons.firstMatch.tap()
+        XCTAssertEqual(app.staticTexts["trendSelectedDate"].label, selectedDate)
+        XCTAssertEqual(coverage.label, "2 of 29 completed days with data")
+        // The detail's own shortcut pops back to the same History stack.
+        reveal(contributions, in: app)
+        contributions.tap()
+        app.buttons["openNutrientTrend"].tap()
+        XCTAssertTrue(app.navigationBars["History"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["trendSelectedDate"].label, selectedDate)
+
+        app.terminate()
+        app.launchArguments += ["--preserve-preferences"]
+        app.launch()
+        app.tabBars.buttons["History"].tap()
+        XCTAssertTrue(app.staticTexts["Last 30 days"].waitForExistence(timeout: 5))
+        app.buttons["Trends"].tap()
+        XCTAssertEqual(picker.value as? String, "Sodium")
+    }
+
+    // Test native accessibility descriptions, the shortcuts, and the visible zero at large text sizes.
+    func testNutritionTrendShortcutsAndZeroAtLargeTextInDarkMode() throws {
+        let app = launch(["--populated-health", "--trend-fixture", "--dark-mode", "--large-text"])
+        connectFixture(app)
+        let shortcut = app.buttons["openNutritionTrends"]
+        reveal(shortcut, in: app)
+        shortcut.tap()
+        let picker = app.buttons["trendNutrient"]
+        XCTAssertTrue(picker.waitForExistence(timeout: 5))
+        XCTAssertEqual(picker.value as? String, "Caffeine")
+        picker.tap()
+        app.buttons["Sodium"].tap()
+        app.buttons["30 days"].tap()
+        app.buttons["7 days"].tap()
+        capture("Trends-Sodium-Chart-Dark-Accessibility3", app)
+        selectTrendDay(containing: "0 mg", in: app)
+        let total = app.staticTexts["trendSelectedTotal"]
+        XCTAssertEqual(total.label, "0 mg")
+        let contributions = app.buttons["viewTrendContributions"]
+        reveal(contributions, in: app)
+        capture("Trends-Sodium-Zero-Dark-Accessibility3", app)
+        try app.performAccessibilityAudit(for: [.sufficientElementDescription])
+        contributions.tap()
+        XCTAssertEqual(app.staticTexts["contributionTotal"].label, "0 mg")
+        XCTAssertTrue(app.staticTexts["Plain water"].exists)
+
+        app.tabBars.buttons["Today"].tap()
+        let calories = app.buttons["nutrientContributions.calories"]
+        reveal(calories, in: app)
+        calories.tap()
+        let viewTrend = app.buttons["openNutrientTrend"]
+        reveal(viewTrend, in: app)
+        viewTrend.tap()
+        XCTAssertTrue(app.navigationBars["History"].waitForExistence(timeout: 5))
+        XCTAssertEqual(picker.value as? String, "Calories")
+    }
+
+    func testNutritionTrendsExplainsEmptyDataAndUnavailableAverage() {
+        let app = launch()
+        app.tabBars.buttons["History"].tap()
+        app.buttons["Trends"].tap()
+        app.buttons["chooseHealthAccess"].tap()
+        XCTAssertTrue(app.staticTexts["trendEmpty"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["trendSelectedTotal"].label, "No visible data")
+        XCTAssertEqual(app.staticTexts["trendAverage"].label, "No average available")
+        XCTAssertEqual(app.staticTexts["trendCoverage"].label, "0 of 6 completed days with data")
+    }
+
+    private func selectTrendDay(containing amount: String, spoken: String? = nil, in app: XCUIApplication) {
+        let choose = app.buttons["chooseTrendDay"]
+        reveal(choose, in: app)
+        choose.tap()
+        let day = app.buttons.matching(NSPredicate(format: "label ENDSWITH %@ OR label ENDSWITH %@",
+                                                   ", " + amount, ", " + (spoken ?? amount))).firstMatch
+        XCTAssertTrue(day.waitForExistence(timeout: 5))
+        day.tap()
     }
 
     /// A sodium card with extra detail shares aligned rows and the breakdown keeps its source note.

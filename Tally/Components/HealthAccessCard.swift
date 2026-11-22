@@ -33,12 +33,47 @@ struct HealthAccessCard: View {
 
 struct HealthReadNote: View {
     @Environment(HealthKitManager.self) private var health
+    var showLimitedWindow = true
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text("Visible Apple Health nutrition · all sources")
             Text("Totals may include other apps and foods. Missing data can mean no entries or restricted read access.")
-            if !health.limitedDates.isEmpty { Text("Some nutrition has a limited history window. Only the dates Health allows are shown.") }
+            if showLimitedWindow && !health.limitedDates.isEmpty {
+                Text("Some nutrition has a limited history window. Only the dates Health allows are shown.")
+            }
             if let refreshed = health.lastRefreshed { Text("Updated \(refreshed.formatted(date: .abbreviated, time: .shortened))") }
         }.font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// Both Trends and its drill-down explain when their shared snapshot has become stale.
+struct HealthSnapshotRefreshNotice: View {
+    @Environment(HealthKitManager.self) private var health
+
+    var body: some View {
+        if let error = health.queryError {
+            VStack(alignment: .leading, spacing: 8) {
+                Label("Health refresh needs attention", systemImage: "exclamationmark.circle").font(.headline)
+                Text(error).font(.subheadline)
+                if health.nutritionHistory != nil {
+                    Text("Showing stale data from the last successful refresh.")
+                        .font(.caption)
+                        .accessibilityIdentifier("staleNutritionSnapshot")
+                }
+                Button("Try Again") { Task { await health.refresh() } }
+            }
+        }
+    }
+}
+
+/// A known time-limited read window has its own explanation on affected days.
+struct NutritionReadWindowNote: View {
+    let window: NutritionHistorySnapshot.ReadWindow
+
+    var body: some View {
+        if window != .full {
+            Text(window == .outside ? "Outside the Apple Health read window." : "Apple Health only shares part of this day.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
     }
 }
