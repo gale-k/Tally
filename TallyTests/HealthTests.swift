@@ -55,9 +55,13 @@ final class HealthTests: XCTestCase {
         XCTAssertEqual(caffeine.metadata?[HealthKitStore.estimatedKey] as? Bool, true)
     }
     @MainActor
-    func testExplicitZeroCreatesSampleButUnknownDoesNot() throws {
-        XCTAssertEqual(try HealthKitStore.makeSamples(for: .init(name: "Chai", nutrition: .init(caffeine: 0))).count, 1)
-        XCTAssertThrowsError(try HealthKitStore.makeSamples(for: .init(name: "Unknown", nutrition: .init())))
+    func testWritesRequireAtLeastOnePositiveAmount() {
+        // A zero-only or empty entry must fail instead of reporting a successful empty Health write.
+        for nutrition in [NutritionValues(caffeine: 0, sugar: 0), NutritionValues()] {
+            XCTAssertThrowsError(try HealthKitStore.makeSamples(for: .init(name: "Chai", nutrition: nutrition))) { error in
+                guard case DrinkValidationError.noNutrition = error else { return XCTFail("Unexpected error: \(error)") }
+            }
+        }
     }
     @MainActor
     func testCoordinatorRequestsThenSavesAndRefreshes() async throws {
@@ -68,6 +72,18 @@ final class HealthTests: XCTestCase {
         XCTAssertEqual(store.saved.count, 1)
         XCTAssertEqual(manager.today.caffeine, 100)
         XCTAssertEqual(manager.events.count, 1)
+    }
+    @MainActor
+    func testZeroAmountDoesNotReopenHealthPermissions() async throws {
+        let store = FakeNutritionStore()
+        let manager = HealthKitManager(client: store, defaults: nil)
+        try await manager.requestAccess()
+        // Simulate a type added after this user last reviewed their Health permissions.
+        store.writeStatuses[.sodium] = .notRequested
+        try await manager.log(.init(name: "Lunch Bowl", nutrition: .init(calories: 380, sodium: 0)))
+        XCTAssertEqual(store.accessRequests, 1)
+        XCTAssertEqual(store.writeStatus(for: .sodium), .notRequested)
+        XCTAssertEqual(manager.today.calories, 380)
     }
     @MainActor
     func testFailedSaveDoesNotCreateHistory() async {
@@ -93,11 +109,11 @@ final class HealthTests: XCTestCase {
         XCTAssertThrowsError(try ConsumptionDraft(name: "Unknown", nutrition: .init()).validate())
     }
     @MainActor
-    func testFoodWritesOnlyKnownNutrientsAndKeepsItsName() throws {
-        let food = ConsumptionDraft(name: "Lunch Bowl", nutrition: .init(calories: 380, sugar: 0, protein: 24, estimated: [.protein]))
+    func testFoodWritesOnlyPositiveNutrientsAndKeepsItsName() throws {
+        // A known zero, even when marked estimated, is skipped alongside blank fields.
+        let food = ConsumptionDraft(name: "Lunch Bowl", nutrition: .init(calories: 380, sugar: 0, protein: 24, estimated: [.sugar, .protein]))
         let samples = try HealthKitStore.makeSamples(for: food)
-        XCTAssertEqual(samples.count, 3)
-        XCTAssertFalse(samples.contains { $0.quantityType == Nutrient.caffeine.healthType })
+        XCTAssertEqual(samples.map(\.quantityType), [Nutrient.calories.healthType, Nutrient.protein.healthType])
         let protein = try XCTUnwrap(samples.first { $0.quantityType == Nutrient.protein.healthType })
         XCTAssertEqual(protein.quantity.doubleValue(for: .gram()), 24)
         XCTAssertEqual(protein.metadata?[HKMetadataKeyFoodType] as? String, "Lunch Bowl")

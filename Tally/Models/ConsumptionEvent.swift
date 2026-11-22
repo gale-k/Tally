@@ -16,7 +16,8 @@ struct ConsumptionDraft: Sendable {
     }
     func validate(now: Date = .now) throws {
         try nutrition.validate()
-        guard !nutrition.isEmpty else { throw DrinkValidationError.noNutrition }
+        // Without a positive amount, HealthKit has no sample to represent this event.
+        guard !nutrition.loggableNutrients.isEmpty else { throw DrinkValidationError.noNutrition }
         guard date.timeIntervalSince1970.isFinite, date <= now else { throw DrinkValidationError.invalidDate }
     }
 }

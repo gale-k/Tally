@@ -67,7 +67,7 @@ struct SettingsView: View {
                 }
                 if let queryError = health.queryError { Text(queryError).font(.footnote).foregroundStyle(.secondary) }
             } header: { Text("Apple Health") }
-            footer: { Text("Health keeps read permissions private. No visible samples can mean no data or restricted access. Allow every known nutrient when logging an item; otherwise nothing in that event is saved.") }
+            footer: { Text("Health keeps read permissions private. No visible samples can mean no data or restricted access. Logging an item requires write access for every nutrient with a positive amount.") }
 
             CloudLibrarySection()
             Section {

@@ -24,9 +24,9 @@ Sodium/salt entry uses one canonical optional `NutritionValues.sodium` value in 
 
 ## Saving a consumption event
 
-Confirmation creates an independent `ConsumptionDraft`, with one UUID and one timestamp. Only present values become `HKQuantitySample`s. Caffeine and sodium use `gramUnit(with: .milli)`, energy uses `kilocalorie()`, and other supported nutrients use `gram()`.
+Confirmation creates an independent `ConsumptionDraft`, with one UUID and one timestamp. Only positive amounts become `HKQuantitySample`s, and an entry requires at least one. Caffeine and sodium use `gramUnit(with: .milli)`, energy uses `kilocalorie()`, and other supported nutrients use `gram()`.
 
-The adapter checks Health availability and exposed write authorization for every present nutrient. It saves the complete sample array in one call. The installed SDK documents that if any object cannot be saved, none of that array is saved. This avoids silently logging only part of an entry when permissions are incomplete.
+The adapter checks Health availability and exposed write authorization for every nutrient with a positive amount. It saves the complete sample array in one call. The installed SDK documents that if any object cannot be saved, none of that array is saved. This avoids silently logging only part of an entry when permissions are incomplete.
 
 Samples use `HKMetadataKeyFoodType` and `HKMetadataKeyWasUserEntered`, plus reverse-DNS custom keys for event ID, brand, size, and that sample’s estimate flag. No local template relationship is required to read the historical event later.
 
