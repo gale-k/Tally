@@ -17,7 +17,9 @@ final class FixtureNutritionStore: NutritionStore {
         ProcessInfo.processInfo.arguments.contains("--write-denied") && nutrient == .caffeine ? .denied : .allowed
     }
     func save(_ event: ConsumptionDraft) async throws {
-        let denied = event.nutrition.knownNutrients.filter { writeStatus(for: $0) != .allowed }
+        // Mirror the production write checks so a skipped zero cannot cause a fixture-only denial.
+        try event.validate()
+        let denied = event.nutrition.loggableNutrients.filter { writeStatus(for: $0) != .allowed }
         guard denied.isEmpty else { throw HealthAccessError.writeDenied(denied.map(\.title)) }
         logged.append(event)
     }
@@ -43,7 +45,7 @@ final class FixtureNutritionStore: NutritionStore {
             }
         }
         return events.flatMap { event in
-            event.nutrition.knownNutrients.map { nutrient in
+            event.nutrition.loggableNutrients.map { nutrient in
                 HealthSample(id: UUID(), nutrient: nutrient, value: event.nutrition[nutrient]!, date: event.date,
                              sourceName: "Tally", sourceBundle: ownBundleIdentifier, eventID: event.id.uuidString,
                              drinkName: event.name, brand: event.brand, size: event.size,

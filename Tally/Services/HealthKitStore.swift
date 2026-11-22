@@ -56,7 +56,7 @@ final class HealthKitStore: NutritionStore {
 
     static func makeSamples(for event: ConsumptionDraft) throws -> [HKQuantitySample] {
         try event.validate()
-        return event.nutrition.knownNutrients.map { nutrient in
+        return event.nutrition.loggableNutrients.map { nutrient in
             var metadata: [String: Any] = [
                 HKMetadataKeyFoodType: event.name,
                 HKMetadataKeyWasUserEntered: true,
@@ -74,7 +74,8 @@ final class HealthKitStore: NutritionStore {
 
     func save(_ event: ConsumptionDraft) async throws {
         guard isAvailable else { throw HealthAccessError.unavailable }
-        let denied = event.nutrition.knownNutrients.filter { writeStatus(for: $0) != .allowed }
+        // Check authorization for the same nutrient types that will produce samples.
+        let denied = event.nutrition.loggableNutrients.filter { writeStatus(for: $0) != .allowed }
         guard denied.isEmpty else { throw HealthAccessError.writeDenied(denied.map(\.title)) }
         // HKHealthStore guarantees that if any object fails, none of this array is saved.
         try await store.save(Self.makeSamples(for: event))

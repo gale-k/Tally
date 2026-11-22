@@ -358,7 +358,7 @@ final class TallyUITests: XCTestCase {
         capture("Sodium-History" + suffix, app)
     }
 
-    /// Explicit zero from Quick Add remains visible, even when sodium is the only selected Today card.
+    /// A positive sodium amount from Quick Add appears even when sodium is the only selected Today card.
     func testQuickAddSodiumCanAppearOnToday() {
         let app = launch()
         app.tabBars.buttons["Settings"].tap()
@@ -370,14 +370,14 @@ final class TallyUITests: XCTestCase {
         let more = app.buttons["More Nutrition"]
         reveal(more, in: app); more.tap()
         let sodium = app.textFields["nutrition.sodium"]
-        reveal(sodium, in: app); sodium.tap(); sodium.typeText("0")
+        reveal(sodium, in: app); sodium.tap(); sodium.typeText("500")
         let log = app.buttons["quickLogToHealth"]
         reveal(log, in: app); log.tap()
         XCTAssertTrue(log.waitForNonExistence(timeout: 10))
         app.tabBars.buttons["Today"].tap()
         XCTAssertTrue(app.staticTexts["Nutrition Today"].exists)
         XCTAssertTrue(app.staticTexts["Sodium"].exists)
-        XCTAssertTrue(app.staticTexts["0 mg"].exists)
+        XCTAssertTrue(app.staticTexts["500 mg"].exists)
         XCTAssertFalse(app.staticTexts["todayCaffeine"].exists)
         capture("Sodium-Only-Today", app)
     }
@@ -601,19 +601,26 @@ final class TallyUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "5 g salt")).firstMatch.exists)
     }
 
-    /// A visible zero is measured data and must show 0% rather than the unknown-data state.
-    func testDailyIntakeKnownZeroStillCompares() {
-        let app = launch()
+    /// Quick Add requires a positive amount, and a denied zero-valued nutrient cannot block logging.
+    func testQuickAddSkipsZeroNutrientsAndRejectsZeroOnlyEntries() {
+        let app = launch(["--write-denied"])
         app.tabBars.buttons["Library"].tap(); app.buttons["Quick Add"].tap()
-        let calories = app.textFields["nutrition.calories"]
-        reveal(calories, in: app); calories.tap(); calories.typeText("0")
+        let caffeine = app.textFields["nutrition.caffeine"]
+        reveal(caffeine, in: app); caffeine.tap(); caffeine.typeText("0")
         let log = app.buttons["quickLogToHealth"]
         reveal(log, in: app); log.tap()
+        let alert = app.alerts["Couldn’t log item"]
+        XCTAssertTrue(alert.staticTexts["Enter at least one nutrient amount greater than zero to log to Apple Health."].waitForExistence(timeout: 5))
+        alert.buttons["OK"].tap()
+
+        let calories = app.textFields["nutrition.calories"]
+        reveal(calories, in: app); calories.tap(); calories.typeText("50")
+        reveal(log, in: app); log.tap()
         XCTAssertTrue(log.waitForNonExistence(timeout: 10))
-        app.tabBars.buttons["Today"].tap()
-        XCTAssertTrue(app.staticTexts["today.calories"].label.contains("0 kcal"))
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "0%")).firstMatch.waitForExistence(timeout: 5))
-        capture("Daily-Intake-Known-Zero", app)
+        app.tabBars.buttons["History"].tap()
+        let event = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "50 kcal")).firstMatch
+        XCTAssertTrue(event.waitForExistence(timeout: 5))
+        XCTAssertFalse(event.label.contains("caffeine"))
     }
 
     /// Empty and failed Health queries cannot manufacture a zero or full remaining allowance.

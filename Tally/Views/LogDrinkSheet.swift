@@ -13,6 +13,9 @@ struct LogDrinkSheet: View {
     @State private var error: String?
 
     var body: some View {
+        let nutrition = drink.nutrition
+        // Keep the entered amounts visible in the review even when the template cannot produce a Health sample.
+        let canLog = !nutrition.loggableNutrients.isEmpty
         Form {
             Section {
                 VStack(alignment: .leading, spacing: 8) {
@@ -24,12 +27,12 @@ struct LogDrinkSheet: View {
                 }.padding(.vertical, 8)
             }
             Section("Known nutrition") {
-                if drink.nutrition.isEmpty { Text("Add at least one nutrition value to this template before logging.").foregroundStyle(.secondary) }
-                else { NutritionSummaryView(nutrition: drink.nutrition) }
+                if !nutrition.isEmpty { NutritionSummaryView(nutrition: nutrition) }
+                if !canLog { Text("Add a nutrient amount greater than zero to this template before logging.").foregroundStyle(.secondary) }
             }
             Section {
                 DatePicker("Date & Time", selection: $date, in: ...Date.now).disabled(saving || savedToHealth)
-            } footer: { Text("Only the values shown above will be saved. ~ means estimated.") }
+            } footer: { Text("Apple Health skips zero amounts. ~ means estimated.") }
             Section {
                 Button {
                     if savedToHealth { dismiss() } else { Task { await log() } }
@@ -38,7 +41,7 @@ struct LogDrinkSheet: View {
                 }
                 .buttonStyle(.borderedProminent).foregroundStyle(Color(.systemBackground))
                 .listRowBackground(Color.clear)
-                .disabled(saving || (!savedToHealth && drink.nutrition.isEmpty))
+                .disabled(saving || (!savedToHealth && !canLog))
                 .accessibilityIdentifier("confirmLogDrink")
             }
             if savedToHealth { Section { Label("Saved to Apple Health", systemImage: "checkmark.circle.fill").foregroundStyle(.green) } }

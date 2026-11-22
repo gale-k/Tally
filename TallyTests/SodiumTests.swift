@@ -114,7 +114,11 @@ final class SodiumTests: XCTestCase {
         XCTAssertEqual(sample.quantity.doubleValue(for: .gram()), 0.5, accuracy: 0.00001)
         XCTAssertEqual(sample.metadata?[HealthKitStore.estimatedKey] as? Bool, true)
         XCTAssertEqual(sample.metadata?[HealthKitStore.eventKey] as? String, event.id.uuidString)
-        XCTAssertEqual(try HealthKitStore.makeSamples(for: .init(name: "Zero", nutrition: .init(sodium: 0))).count, 1)
+        // Zero entered as salt converts to zero sodium and is omitted from a mixed entry.
+        draft.values[.sodium] = "0"
+        draft.values[.calories] = "100"
+        let zeroSalt = ConsumptionDraft(name: "Soup", nutrition: try draft.nutrition())
+        XCTAssertEqual(try HealthKitStore.makeSamples(for: zeroSalt).map(\.quantityType), [Nutrient.calories.healthType])
     }
 
     func testSodiumFlowsThroughTodayHistoryAndNewPermissionRequest() async throws {

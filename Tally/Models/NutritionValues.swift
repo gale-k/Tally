@@ -27,7 +27,7 @@ enum Nutrient: String, CaseIterable, Codable, Identifiable, Sendable {
     var inputLimit: Double { self == .caffeine ? 10_000 : self == .calories ? 50_000 : 10_000 }
 }
 
-/// A missing value is unknown. An explicit zero remains a real, loggable measurement.
+/// A missing value is unknown. Saved templates and Health history can retain explicit zeroes.
 struct NutritionValues: Codable, Equatable, Sendable {
     var caffeine: Double?
     var calories: Double?
@@ -72,6 +72,9 @@ struct NutritionValues: Codable, Equatable, Sendable {
     var knownNutrients: [Nutrient] { Nutrient.allCases.filter { self[$0] != nil } }
     var isEmpty: Bool { knownNutrients.isEmpty }
 
+    // New Health samples and their write permissions only apply to positive amounts.
+    var loggableNutrients: [Nutrient] { Nutrient.allCases.filter { (self[$0] ?? 0) > 0 } }
+
     // Summaries show only known values. Foods without caffeine never get a misleading caffeine placeholder.
     var displayNutrients: [Nutrient] { Nutrient.displayOrder.filter { self[$0] != nil } }
     var summaryNutrients: [Nutrient] { Array(displayNutrients.prefix(2)) }
@@ -100,7 +103,7 @@ enum DrinkValidationError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .nameRequired: "Give your item a name."
-        case .noNutrition: "Add at least one nutrition value before logging. Unknown values can stay blank."
+        case .noNutrition: "Enter at least one nutrient amount greater than zero to log to Apple Health."
         case let .invalidNumber(name, limit, unit): "Enter a number from 0 to \(limit.formatted()) \(unit) for \(name.lowercased())."
         // The selected unit is retained in validation feedback for both food and drink amounts.
         case let .invalidAmount(unit): "Enter an amount greater than 0 and no more than 100,000 \(unit.rawValue), or leave it blank."

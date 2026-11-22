@@ -27,7 +27,7 @@ Local Simulator screenshots with synthetic test data, not personal Health histor
 1. Open `Tally.xcodeproj` in Xcode 27.0 or later. The project uses the installed iOS 27 SDK and requires iOS 27.0 or later.
 2. Select your Apple development team. HealthKit, iCloud/CloudKit, Push Notifications, remote-notification background mode, and Health purpose descriptions are configured. Create/select `iCloud.gale-k.Tally` in Signing & Capabilities and regenerate provisioning for these capabilities. See [iCloud setup](docs/ICLOUD_SYNC.md#developer-setup).
 3. Build and run on an iPhone. Add a food or drink in **Library**, then tap it to review its nutrition and log time.
-4. Choose Health permissions when requested. Logging requires write access for every known nutrient in that entry; a denied field fails the entire event without saving partial nutrition.
+4. Choose Health permissions when requested. Tally only sends positive nutrient amounts to Apple Health. Each entry needs at least one positive amount and write access for every nutrient it sends.
 
 In Debug builds, **Settings → Development → Add Development Examples** inserts six synthetic food and drink templates once. These are demonstration values, not a nutrition reference. The original once-only marker is retained, so users who previously added examples do not receive another batch. Unknown nutrition stays blank. Presets are never inserted automatically in a normal launch and are compiled out of Release builds.
 
