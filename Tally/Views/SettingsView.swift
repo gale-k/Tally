@@ -35,7 +35,7 @@ struct SettingsView: View {
                 Toggle("Show Calories", isOn: $showCalories)
                 Toggle("Show Protein", isOn: $showProtein)
                 Toggle("Show Sugar", isOn: $showSugar)
-                Toggle("Show Caffeine & Trend", isOn: $showCaffeine)
+                Toggle("Show Caffeine Card", isOn: $showCaffeine)
                 Toggle("Show Sodium", isOn: $showSodium)
             } header: { Text("Nutrition on Today") }
             footer: { Text("Choose the summaries you want to see. All nutrition remains available in templates, Quick Add, and history details.") }

@@ -1,7 +1,36 @@
 import SwiftUI
 
-/// Each day's totals include exactly its visible samples; only Tally-owned samples are reconstructed as multi-nutrient events.
+enum HistorySection: String, CaseIterable, Identifiable {
+    case entries = "Entries", trends = "Trends"
+    var id: Self { self }
+}
+
 struct HistoryView: View {
+    @Binding var section: HistorySection
+    @Binding var nutrient: Nutrient
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // The switch stays in view when scrolling either History surface.
+            Picker("History view", selection: $section) {
+                ForEach(HistorySection.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 8)
+
+            switch section {
+            case .entries: HistoryEntriesView()
+            case .trends: NutritionTrendsView(nutrient: $nutrient)
+            }
+        }
+        .background(Color(.systemGroupedBackground))
+        .navigationTitle("History")
+    }
+}
+
+/// Each day's totals include exactly its visible samples; only Tally-owned samples are reconstructed as multi-nutrient events.
+private struct HistoryEntriesView: View {
     @Environment(HealthKitManager.self) private var health
     @State private var selected: ConsumptionEvent?
     var body: some View {
@@ -30,7 +59,6 @@ struct HistoryView: View {
                     .listRowBackground(Color.clear)
             }
         }
-        .navigationTitle("History")
         .refreshable { await health.refresh() }
         .toolbar { if health.isLoading { ProgressView() } }
         .sheet(item: $selected) { event in NavigationStack { HistoryEventDetail(event: event) } }

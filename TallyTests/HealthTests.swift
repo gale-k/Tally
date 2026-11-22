@@ -88,15 +88,6 @@ final class HealthTests: XCTestCase {
         XCTAssertNotNil(manager.queryError)
         XCTAssertNil(manager.today.caffeine)
     }
-    func testTrendRetainsEstimatesAndDoesNotInventUnknownDays() throws {
-        let now = Date.now
-        var sample = record(.caffeine, 100, now.addingTimeInterval(-1))
-        sample.isEstimated = true
-        let days = try HealthAggregation.caffeineDays([sample], count: 2, now: now)
-        XCTAssertNil(days[0].total)
-        XCTAssertEqual(days[1].total, 100)
-        XCTAssertTrue(days[1].isEstimated)
-    }
     func testFutureAndEmptyConsumptionAreRejected() {
         XCTAssertThrowsError(try ConsumptionDraft(name: "Coffee", nutrition: .init(caffeine: 100), date: Date.now.addingTimeInterval(3_600)).validate())
         XCTAssertThrowsError(try ConsumptionDraft(name: "Unknown", nutrition: .init()).validate())
@@ -131,13 +122,13 @@ final class HealthTests: XCTestCase {
         let named = record(.sugar, 5, now, "other", "food")
         let records = [estimated, record(.calories, 100, now, "own", "food"), unnamed, named,
                        record(.sugar, 0, now, "own", "zero")]
-        let events = try HealthAggregation.events(records, ownBundle: "own", unnamedExternal: "Unnamed nutrition entry")
+        let events = try HealthAggregation.events(records, ownBundle: "own")
         let positive = events.filter { ($0.nutrition.sugar ?? 0) > 0 }
         XCTAssertEqual(positive.count, 3)
         XCTAssertEqual(positive.compactMap { $0.nutrition.sugar }.reduce(0, +), try HealthAggregation.totals(records).sugar)
         XCTAssertTrue(try XCTUnwrap(positive.first(where: \.isFromTally)).nutrition.estimated.contains(.sugar))
-        XCTAssertEqual(positive.filter { $0.name == "Unnamed nutrition entry" }.count, 1)
-        XCTAssertEqual(positive.filter { $0.name == "Coffee" && !$0.isFromTally }.count, 1)
+        XCTAssertEqual(positive.filter { $0.contributionName == "Unnamed nutrition entry" }.count, 1)
+        XCTAssertEqual(positive.filter { $0.contributionName == "Coffee" && !$0.isFromTally }.count, 1)
     }
     private func record(_ nutrient: Nutrient, _ value: Double, _ date: Date, _ bundle: String = "own", _ event: String? = nil) -> HealthSample {
         .init(id: UUID(), nutrient: nutrient, value: value, date: date, sourceName: bundle, sourceBundle: bundle,
@@ -152,6 +143,8 @@ final class FakeNutritionStore: NutritionStore {
     var saved: [ConsumptionDraft] = []
     var saveError: Error?
     var queryError: Error?
+    var fixtureSamples: [HealthSample] = []
+    var readLimits: [Nutrient: Date] = [:]
     // Tests can model an undecided newly supported type separately from an explicit denial.
     var accessRequests = 0
     var writeStatuses: [Nutrient: NutritionWriteStatus] = [:]
@@ -164,9 +157,9 @@ final class FakeNutritionStore: NutritionStore {
         if let saveError { throw saveError }
         saved.append(event)
     }
-    func samples(in range: DateInterval) async throws -> [HealthSample] {
+    func samples(in range: DateInterval, limitedBy limits: [Nutrient: Date]) async throws -> [HealthSample] {
         if let queryError { throw queryError }
-        return saved.flatMap { event in
+        return fixtureSamples + saved.flatMap { event in
             event.nutrition.knownNutrients.map { nutrient in
                 HealthSample(id: UUID(), nutrient: nutrient, value: event.nutrition[nutrient]!, date: event.date,
                              sourceName: "Tally", sourceBundle: "own", eventID: event.id.uuidString, drinkName: event.name,
@@ -174,5 +167,5 @@ final class FakeNutritionStore: NutritionStore {
             }
         }
     }
-    func limitedReadDates() async throws -> [Nutrient: Date] { [:] }
+    func limitedReadDates() async throws -> [Nutrient: Date] { readLimits }
 }

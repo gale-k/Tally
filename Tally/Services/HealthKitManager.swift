@@ -7,20 +7,20 @@ final class HealthKitManager {
     private let client: any NutritionStore
     private let defaults: UserDefaults?
     private var refreshID = UUID()
-    private var todayWindow: DateInterval?
+    private var samples: [HealthSample] = []
     private(set) var permissionsRequested: Bool
     private(set) var isLoading = false
     private(set) var isSaving = false
-    private(set) var samples: [HealthSample] = []
-    private(set) var events: [ConsumptionEvent] = []
-    // The dashboard and its drill-down are replaced together from the same local-day snapshot.
-    private(set) var todayEvents: [ConsumptionEvent] = []
-    private(set) var historyDays: [HistoryDay] = []
-    private(set) var today = NutritionValues()
-    private(set) var caffeineDays: [CaffeineDay] = []
-    private(set) var limitedDates: [Nutrient: Date] = [:]
+    private(set) var nutritionHistory: NutritionHistorySnapshot?
     private(set) var queryError: String?
     private(set) var lastRefreshed: Date?
+
+    // Existing dashboard and History consumers project from the same snapshot as Trends.
+    var today: NutritionValues { nutritionHistory?.today.totals ?? NutritionValues() }
+    var todayEvents: [ConsumptionEvent] { nutritionHistory?.today.events ?? [] }
+    var historyDays: [HistoryDay] { nutritionHistory?.days.reversed().filter { !$0.events.isEmpty } ?? [] }
+    var events: [ConsumptionEvent] { historyDays.flatMap(\.events) }
+    var limitedDates: [Nutrient: Date] { nutritionHistory?.limitedDates ?? [:] }
 
     init(client: any NutritionStore = HealthKitStore(), defaults: UserDefaults? = .standard) {
         self.client = client; self.defaults = defaults
@@ -52,32 +52,45 @@ final class HealthKitManager {
         await refresh()
     }
 
-    func refresh(now: Date = .now) async {
+    func refresh(now: Date = .now, calendar: Calendar = .current) async {
         guard isAvailable, permissionsRequested else { return }
-        let window = DateWindows.day(containing: now)
-        // Never compare yesterday's total with today's target if the new day's query fails.
-        if todayWindow != window { today = NutritionValues(); todayEvents = []; todayWindow = window }
         let token = UUID()
         refreshID = token
         isLoading = true
         defer { if refreshID == token { isLoading = false } }
+        var limits = limitedDates
+        if let snapshot = nutritionHistory,
+           snapshot.calendar != calendar || snapshot.today.date != calendar.startOfDay(for: now) || now < (lastRefreshed ?? now) {
+            // Rebucket retained samples immediately so yesterday's total never appears under today's date.
+            nutritionHistory = try? makeSnapshot(samples, limits: limits, now: now, calendar: calendar)
+        }
         do {
-            let records = try await client.samples(in: DateWindows.recent(days: 30, now: now))
-            let limits = try await client.limitedReadDates()
-            let grouped = try HealthAggregation.events(records, ownBundle: client.ownBundleIdentifier)
-            let history = try HealthAggregation.historyDays(records, events: grouped)
-            let dailySamples = records.filter { DateWindows.contains($0.date, in: window) }
-            let daily = try HealthAggregation.totals(dailySamples)
-            let dailyEvents = try HealthAggregation.events(dailySamples, ownBundle: client.ownBundleIdentifier,
-                                                           unnamedExternal: "Unnamed nutrition entry")
-            let trend = try HealthAggregation.caffeineDays(records, count: 7, now: now)
+            limits = try await client.limitedReadDates()
+            let range = DateWindows.recent(days: NutritionHistorySnapshot.dayCount, now: now, calendar: calendar)
+            let records = try await client.samples(in: range, limitedBy: limits)
+            let snapshot = try makeSnapshot(records, limits: limits, now: now, calendar: calendar)
             // A stale foreground refresh must not overwrite a newer post-save response.
             guard refreshID == token else { return }
-            samples = records; events = grouped; historyDays = history; today = daily; todayEvents = dailyEvents; caffeineDays = trend
-            limitedDates = limits; queryError = nil; lastRefreshed = now
+            samples = records
+            nutritionHistory = snapshot
+            queryError = nil
+            lastRefreshed = now
         } catch {
             guard refreshID == token else { return }
+            if let snapshot = nutritionHistory {
+                // Apply tighter limits immediately. Only a successful fetch can widen the cached read window.
+                let retainedLimits = snapshot.limitedDates.merging(limits, uniquingKeysWith: max)
+                if retainedLimits != snapshot.limitedDates {
+                    nutritionHistory = try? makeSnapshot(samples, limits: retainedLimits, now: now, calendar: calendar)
+                }
+            }
             queryError = "Couldn’t refresh Apple Health. \(error.localizedDescription)"
         }
+    }
+
+    private func makeSnapshot(_ records: [HealthSample], limits: [Nutrient: Date], now: Date,
+                              calendar: Calendar) throws -> NutritionHistorySnapshot {
+        try NutritionHistorySnapshot(samples: records, ownBundle: client.ownBundleIdentifier,
+                                     limitedDates: limits, now: now, calendar: calendar)
     }
 }

@@ -6,6 +6,7 @@ import SwiftData
 struct TodayView: View {
     @Environment(HealthKitManager.self) private var health
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.openNutritionTrends) private var openNutritionTrends
     @Query private var drinks: [SavedDrink]
     @AppStorage("showCalories") private var showCalories = true
     @AppStorage("showSugar") private var showSugar = true
@@ -42,6 +43,9 @@ struct TodayView: View {
                         }
                     }
                 }
+                // Trends stays available even when every Today card is hidden.
+                Button { openNutritionTrends(nil) } label: { Label("View Trends", systemImage: "chart.bar") }
+                    .accessibilityIdentifier("openNutritionTrends")
                 // The breakdown remains accessible even when every dashboard card is hidden.
                 NavigationLink {
                     DailyIntakeBreakdownView()
@@ -80,7 +84,6 @@ struct TodayView: View {
                 Button { sheet = .quickAdd } label: {
                     Label("Quick Add a one-off entry", systemImage: "plus.circle").frame(maxWidth: .infinity, minHeight: 32)
                 }.buttonStyle(.bordered)
-                if showCaffeine { CaffeineTrendView(days: health.caffeineDays) }
             }.padding(20)
         }
         .background(Color(.systemGroupedBackground))

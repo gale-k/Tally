@@ -8,7 +8,8 @@ protocol NutritionStore {
     func requestAccess() async throws
     func writeStatus(for nutrient: Nutrient) -> NutritionWriteStatus
     func save(_ event: ConsumptionDraft) async throws
-    func samples(in range: DateInterval) async throws -> [HealthSample]
+    // The refresh uses these same per-type limits for querying and explaining visible coverage.
+    func samples(in range: DateInterval, limitedBy limits: [Nutrient: Date]) async throws -> [HealthSample]
     func limitedReadDates() async throws -> [Nutrient: Date]
 }
 

@@ -89,9 +89,12 @@ struct NutritionValues: Codable, Equatable, Sendable {
         }
     }
 
-    func formatted(_ nutrient: Nutrient) -> String? {
+    func formatted(_ nutrient: Nutrient, forSpeech: Bool = false) -> String? {
         guard let value = self[nutrient] else { return nil }
-        return "\(estimated.contains(nutrient) ? "~" : "")\(value.formatted(.number.precision(.fractionLength(0...2)))) \(nutrient.unit)"
+        let amount = "\(value.formatted(.number.precision(.fractionLength(0...2)))) \(nutrient.unit)"
+        // Spell out the estimate for VoiceOver instead of relying on punctuation.
+        guard estimated.contains(nutrient) else { return amount }
+        return forSpeech ? "Approximately \(amount)" : "~\(amount)"
     }
 }
 

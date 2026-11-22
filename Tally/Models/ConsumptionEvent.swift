@@ -45,6 +45,13 @@ struct ConsumptionEvent: Identifiable, Sendable {
     var sourceName: String
     var isFromTally: Bool
     var nutrition: NutritionValues
+    var recordedName: String?
+
+    // Entries keeps its historical fallback. The drill-down identifies unnamed samples explicitly.
+    var contributionName: String {
+        let trimmed = recordedName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.flatMap { $0.isEmpty ? nil : $0 } ?? (isFromTally ? "Nutrition entry" : "Unnamed nutrition entry")
+    }
 }
 
 struct HistoryDay: Identifiable, Sendable {
@@ -52,27 +59,35 @@ struct HistoryDay: Identifiable, Sendable {
     var events: [ConsumptionEvent]
     var totals: NutritionValues
     var id: Date { date }
-}
 
-struct CaffeineDay: Identifiable, Sendable {
-    var date: Date
-    var total: Double?
-    var isEstimated = false
-    var id: Date { date }
+    // An explicitly recorded zero still has a source and belongs in the drill-down.
+    func contributions(for nutrient: Nutrient) -> [ConsumptionEvent] {
+        events.filter { $0.nutrition[nutrient] != nil }
+    }
 }
 
 /// Calendar arithmetic respects local midnight and daylight-saving changes.
 enum DateWindows {
     static func day(containing date: Date, calendar: Calendar = .current) -> DateInterval {
-        let start = calendar.startOfDay(for: date)
-        return DateInterval(start: start, end: calendar.date(byAdding: .day, value: 1, to: start)!)
+        calendar.dateInterval(of: .day, for: date)!
     }
     static func recent(days: Int, now: Date = .now, calendar: Calendar = .current) -> DateInterval {
-        let start = calendar.date(byAdding: .day, value: -(max(1, days) - 1), to: calendar.startOfDay(for: now))!
-        return DateInterval(start: start, end: now)
+        DateInterval(start: dayStart(daysAgo: max(1, days) - 1, now: now, calendar: calendar), end: now)
+    }
+    // Normalize each date separately because some time zones move their clocks at midnight.
+    static func dayStart(daysAgo: Int, now: Date, calendar: Calendar) -> Date {
+        calendar.startOfDay(for: calendar.date(byAdding: .day, value: -daysAgo, to: calendar.startOfDay(for: now))!)
     }
     // DateInterval.contains includes the end point; day totals must use a half-open interval instead.
     static func contains(_ date: Date, in range: DateInterval) -> Bool { date >= range.start && date < range.end }
+
+    // A refresh captures its calendar and time zone together; format with both during the same render.
+    static func format(_ date: Date, as style: Date.FormatStyle, calendar: Calendar) -> String {
+        var style = style
+        style.calendar = calendar
+        style.timeZone = calendar.timeZone
+        return date.formatted(style)
+    }
 }
 
 enum HealthAggregation {
@@ -87,7 +102,7 @@ enum HealthAggregation {
         return result
     }
 
-    static func events(_ samples: [HealthSample], ownBundle: String, unnamedExternal: String? = nil) throws -> [ConsumptionEvent] {
+    static func events(_ samples: [HealthSample], ownBundle: String) throws -> [ConsumptionEvent] {
         let groups = Dictionary(grouping: samples) { sample in
             // Never combine another app's samples by time, nor trust copied Tally metadata from another source.
             guard sample.sourceBundle == ownBundle else { return "sample:\(sample.id.uuidString)" }
@@ -98,30 +113,11 @@ enum HealthAggregation {
             let ordered = records.sorted { $0.id.uuidString < $1.id.uuidString }
             let first = ordered[0]
             let own = first.sourceBundle == ownBundle
-            // Preserve existing History labels; the drill-down also treats blank metadata as unnamed.
-            let name = unnamedExternal == nil ? first.drinkName : first.drinkName?.trimmingCharacters(in: .whitespacesAndNewlines)
             return ConsumptionEvent(id: key, date: first.date,
-                                    name: (unnamedExternal == nil ? name : (name?.isEmpty == false ? name : nil)) ?? (own ? "Nutrition entry" : unnamedExternal ?? first.nutrient.title),
+                                    name: first.drinkName ?? (own ? "Nutrition entry" : first.nutrient.title),
                                     brand: own ? first.brand : nil, size: own ? first.size : nil,
-                                    sourceName: first.sourceName, isFromTally: own, nutrition: try totals(records))
+                                    sourceName: first.sourceName, isFromTally: own, nutrition: try totals(records),
+                                    recordedName: first.drinkName)
         }.sorted { $0.date == $1.date ? $0.id < $1.id : $0.date > $1.date }
-    }
-
-    static func historyDays(_ samples: [HealthSample], events: [ConsumptionEvent], calendar: Calendar = .current) throws -> [HistoryDay] {
-        let sampleDays = Dictionary(grouping: samples) { calendar.startOfDay(for: $0.date) }
-        let eventDays = Dictionary(grouping: events) { calendar.startOfDay(for: $0.date) }
-        return try eventDays.map { date, events in
-            HistoryDay(date: date, events: events.sorted { $0.date > $1.date }, totals: try totals(sampleDays[date] ?? []))
-        }.sorted { $0.date > $1.date }
-    }
-
-    static func caffeineDays(_ samples: [HealthSample], count: Int, now: Date = .now,
-                             calendar: Calendar = .current) throws -> [CaffeineDay] {
-        try (0..<count).reversed().map { offset in
-            let date = calendar.date(byAdding: .day, value: -offset, to: calendar.startOfDay(for: now))!
-            let range = DateWindows.day(containing: date, calendar: calendar)
-            let nutrition = try totals(samples.filter { $0.nutrient == .caffeine && DateWindows.contains($0.date, in: range) })
-            return CaffeineDay(date: date, total: nutrition.caffeine, isEstimated: nutrition.estimated.contains(.caffeine))
-        }
     }
 }
