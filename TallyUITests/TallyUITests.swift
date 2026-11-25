@@ -218,6 +218,86 @@ final class TallyUITests: XCTestCase {
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "~100 mg caffeine")).firstMatch.exists)
     }
 
+    /// Exercise the same snapshot through logging, changing its quantity, repeating it and deleting the repeat.
+    func testFractionalServingQuantityAndHistoryActions() {
+        let app = launch(["--seed-library"])
+        app.tabBars.buttons["Library"].tap()
+        app.buttons["drink.Iced Mocha"].tap()
+
+        let quantity = app.textFields["servingQuantity"]
+        let increase = app.buttons["increaseServingQuantity"]
+        let decrease = app.buttons["decreaseServingQuantity"]
+        let log = app.buttons["confirmLogDrink"]
+        let totalServingSize = app.staticTexts["totalServingSize"]
+        XCTAssertTrue(quantity.waitForExistence(timeout: 5))
+        XCTAssertEqual(quantity.value as? String, "1")
+        XCTAssertTrue(app.staticTexts["470 ml per serving"].exists)
+        increase.tap()
+        XCTAssertEqual(quantity.value as? String, "2")
+        XCTAssertTrue(totalServingSize.label.contains("940 ml"))
+        decrease.tap()
+        XCTAssertEqual(quantity.value as? String, "1")
+        replace(quantity, with: "0")
+        XCTAssertFalse(log.isEnabled)
+        replace(quantity, with: "1.5")
+        let finishEditing = app.buttons["finishServingQuantityEditing"]
+        XCTAssertTrue(finishEditing.waitForExistence(timeout: 5))
+        finishEditing.tap()
+        XCTAssertTrue(totalServingSize.label.contains("705 ml"))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "150 mg")).firstMatch.exists)
+        reveal(log, in: app); log.tap()
+        XCTAssertTrue(log.waitForNonExistence(timeout: 10))
+
+        app.buttons["More actions for Iced Mocha"].tap()
+        app.buttons["Edit Item"].tap()
+        replace(app.textFields["nutrition.caffeine"], with: "110")
+        app.buttons["saveDrink"].tap()
+
+        app.tabBars.buttons["History"].tap()
+        let entry = app.buttons.matching(NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "Iced Mocha", "150 mg caffeine"))
+        XCTAssertTrue(entry.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertEqual(entry.count, 1)
+        XCTAssertTrue(entry.firstMatch.label.contains("1.5 servings"))
+        entry.firstMatch.tap()
+        let edit = app.buttons["historyEditQuantity"]
+        XCTAssertTrue(edit.waitForExistence(timeout: 5))
+        edit.tap()
+        let save = app.buttons["historySaveQuantity"]
+        XCTAssertTrue(save.waitForExistence(timeout: 5))
+        XCTAssertEqual(quantity.value as? String, "1.5")
+        XCTAssertFalse(save.isEnabled)
+        increase.tap()
+        XCTAssertEqual(quantity.value as? String, "2.5")
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "250 mg")).firstMatch.exists)
+        save.tap()
+        XCTAssertTrue(save.waitForNonExistence(timeout: 10))
+
+        let edited = app.buttons.matching(NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "Iced Mocha", "250 mg caffeine"))
+        XCTAssertTrue(edited.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertFalse(entry.firstMatch.exists)
+        XCTAssertTrue(edited.firstMatch.label.contains("2.5 servings"))
+        edited.firstMatch.swipeLeft()
+        let repeatLog = app.buttons["Log Again"]
+        XCTAssertTrue(repeatLog.waitForExistence(timeout: 5))
+        XCTAssertEqual(edited.count, 1)
+        repeatLog.tap()
+        XCTAssertTrue(edited.element(boundBy: 1).waitForExistence(timeout: 5))
+        XCTAssertEqual(edited.count, 2)
+        edited.firstMatch.tap()
+        let delete = app.buttons["historyDeleteEntry"]
+        reveal(delete, in: app); delete.tap()
+        let confirmDelete = app.buttons["Delete from Apple Health"]
+        XCTAssertTrue(confirmDelete.waitForExistence(timeout: 5))
+        confirmDelete.tap()
+        XCTAssertTrue(delete.waitForNonExistence(timeout: 10))
+        XCTAssertEqual(edited.count, 1)
+
+        app.tabBars.buttons["Today"].tap()
+        let today = app.staticTexts["todayCaffeine"]
+        XCTAssertTrue(today.waitForExistence(timeout: 5))
+        XCTAssertTrue(today.label.contains("250"))
+    }
+
     /// Exercise archive browsing, editing and restoration at standard and accessibility text sizes.
     func testArchiveAndRestore() throws { try verifyArchive() }
     func testArchiveAndRestoreWithLargeText() throws { try verifyArchive(["--large-text"]) }

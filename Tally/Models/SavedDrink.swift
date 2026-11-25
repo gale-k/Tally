@@ -135,6 +135,12 @@ final class SavedDrink {
     var hasRecipe: Bool { recipeIngredients != nil || recipeMethod != nil }
     var category: DrinkCategory { DrinkCategory(rawValue: categoryRaw) ?? .other }
     var servingStyle: ServingStyle { ServingStyle(rawValue: servingStyleRaw) ?? .other }
+    var servingAmount: ServingAmount? {
+        // Prefer a structured amount, then recognize unambiguous metric labels from older templates.
+        if let weightG { return ServingAmount(value: weightG, unit: .grams) }
+        if let volumeMl { return ServingAmount(value: volumeMl, unit: .millilitres) }
+        return ServingAmount(size: size)
+    }
     var nutrition: NutritionValues {
         get { .init(caffeine: caffeineMg, calories: caloriesKcal, sugar: sugarG, carbohydrates: carbohydratesG,
                     protein: proteinG, totalFat: totalFatG, saturatedFat: saturatedFatG, fibre: fibreG, sodium: sodiumMg,

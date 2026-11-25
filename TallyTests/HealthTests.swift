@@ -55,6 +55,50 @@ final class HealthTests: XCTestCase {
         XCTAssertEqual(caffeine.metadata?[HealthKitStore.estimatedKey] as? Bool, true)
     }
     @MainActor
+    func testServingSamplesCarryTotalsAndStableSyncMetadata() throws {
+        let date = Date.now.addingTimeInterval(-60)
+        let base = NutritionValues(calories: 100, protein: 8, sodium: 0, estimated: [.protein])
+        let original = ConsumptionDraft(name: "Biscuits", nutrition: base, date: date, quantity: 1.5,
+                                        servingAmount: .init(value: 25, unit: .grams))
+        let modified = ConsumptionDraft(id: original.id, name: original.name, nutrition: base, date: date, quantity: 2.5,
+                                        servingAmount: original.servingAmount)
+        let initialSamples = try HealthKitStore.makeSamples(for: original)
+        let replacement = try HealthKitStore.makeSamples(for: modified, syncVersion: 2)
+        XCTAssertEqual(replacement.count, 2)
+        for (previous, current) in zip(initialSamples, replacement) {
+            // Versioning is per nutrient. Different quantities replace the same sample IDs in Health.
+            XCTAssertEqual(previous.metadata?[HKMetadataKeySyncIdentifier] as? String, current.metadata?[HKMetadataKeySyncIdentifier] as? String)
+            XCTAssertEqual((current.metadata?[HKMetadataKeySyncVersion] as? NSNumber)?.int64Value, 2)
+            XCTAssertEqual(current.metadata?[HealthKitStore.quantityKey] as? Double, 2.5)
+            XCTAssertEqual(current.metadata?[HealthKitStore.servingValueKey] as? Double, 25)
+            XCTAssertEqual(current.metadata?[HealthKitStore.servingUnitKey] as? String, "g")
+            let expected = try XCTUnwrap(current.metadata?[HealthKitStore.nutrientsKey] as? String)
+            XCTAssertEqual(Set(expected.split(separator: ",")), ["calories", "protein"])
+        }
+        let protein = try XCTUnwrap(replacement.first { $0.quantityType == Nutrient.protein.healthType })
+        XCTAssertEqual(protein.metadata?[HealthKitStore.perServingKey] as? Double, 8)
+        XCTAssertEqual(protein.quantity.doubleValue(for: .gram()), 20)
+        XCTAssertNotEqual(replacement[0].metadata?[HKMetadataKeySyncIdentifier] as? String, replacement[1].metadata?[HKMetadataKeySyncIdentifier] as? String)
+    }
+
+    @MainActor
+    func testFailedLegacySampleDeletionRollsBackStagedSamples() async throws {
+        let old = try HealthKitStore.makeSamples(for: .init(name: "Coffee", nutrition: .init(caffeine: 100)))
+        let staged = try HealthKitStore.makeSamples(for: .init(name: "Coffee", nutrition: .init(caffeine: 100), quantity: 1.5))
+        var persisted = Set(old.map(\.uuid))
+        do {
+            try await HealthKitStore.replaceLegacySamples(old, with: staged, save: { samples in
+                persisted.formUnion(samples.map(\.uuid))
+            }, delete: { samples in
+                if samples.map(\.uuid) == old.map(\.uuid) { throw HealthAccessError.unavailable }
+                persisted.subtract(samples.map(\.uuid))
+            })
+            XCTFail("Expected deletion to fail")
+        } catch HealthAccessError.unavailable {}
+        // Only the originals survive, so a retry cannot create duplicate Health records.
+        XCTAssertEqual(persisted, Set(old.map(\.uuid)))
+    }
+    @MainActor
     func testWritesRequireAtLeastOnePositiveAmount() {
         // A zero-only or empty entry must fail instead of reporting a successful empty Health write.
         for nutrition in [NutritionValues(caffeine: 0, sugar: 0), NutritionValues()] {
@@ -72,6 +116,44 @@ final class HealthTests: XCTestCase {
         XCTAssertEqual(store.saved.count, 1)
         XCTAssertEqual(manager.today.caffeine, 100)
         XCTAssertEqual(manager.events.count, 1)
+    }
+    @MainActor
+    func testCoordinatorEditsRepeatsAndDeletesServingSnapshots() async throws {
+        let store = FakeNutritionStore()
+        let manager = HealthKitManager(client: store, defaults: nil)
+        let draft = ConsumptionDraft(name: "Coffee", nutrition: .init(caffeine: 100, calories: 20),
+                                     date: .now.addingTimeInterval(-60), quantity: 1.5)
+        try await manager.log(draft)
+        let original = try XCTUnwrap(manager.events.first)
+        XCTAssertEqual(original.quantity, 1.5)
+        XCTAssertEqual(original.nutrition.caffeine, 150)
+
+        try await manager.updateQuantity(original, quantity: 2.5)
+        let updated = try XCTUnwrap(manager.events.first)
+        XCTAssertEqual(manager.events.count, 1)
+        XCTAssertEqual(updated.id, original.id)
+        XCTAssertEqual(updated.date, original.date)
+        XCTAssertEqual(updated.nutrition.caffeine, 250)
+        XCTAssertEqual(store.saved.count, 1)
+        XCTAssertEqual(store.saved[0].nutrition.calories, 50)
+        XCTAssertEqual(store.saved[0].perServingNutrition.calories, 20)
+
+        try await manager.logAgain(updated)
+        XCTAssertEqual(manager.events.count, 2)
+        let repeated = try XCTUnwrap(manager.events.first)
+        XCTAssertNotEqual(repeated.id, updated.id)
+        XCTAssertGreaterThan(repeated.date, updated.date)
+        XCTAssertEqual(repeated.quantity, 2.5)
+        XCTAssertEqual(repeated.nutrition, updated.nutrition)
+
+        try await manager.delete(repeated)
+        XCTAssertEqual(manager.events.map(\.id), [updated.id])
+        XCTAssertEqual(store.saved.map(\.id), [draft.id])
+        do {
+            try await manager.updateQuantity(original, quantity: 5)
+            XCTFail("Expected the original samples to be stale")
+        } catch HealthAccessError.entryChanged {}
+        XCTAssertEqual(manager.events.first?.quantity, 2.5)
     }
     @MainActor
     func testZeroAmountDoesNotReopenHealthPermissions() async throws {
@@ -161,6 +243,8 @@ final class FakeNutritionStore: NutritionStore {
     var queryError: Error?
     var fixtureSamples: [HealthSample] = []
     var readLimits: [Nutrient: Date] = [:]
+    // Keep sample UUIDs stable until a Health operation replaces or deletes the samples.
+    private var savedSamples: [HealthSample] = []
     // Tests can model an undecided newly supported type separately from an explicit denial.
     var accessRequests = 0
     var writeStatuses: [Nutrient: NutritionWriteStatus] = [:]
@@ -172,16 +256,39 @@ final class FakeNutritionStore: NutritionStore {
     func save(_ event: ConsumptionDraft) async throws {
         if let saveError { throw saveError }
         saved.append(event)
+        savedSamples += makeSamples(event)
+    }
+    func verifyCurrent(_ event: ConsumptionEvent) async throws {
+        guard !event.sampleIDs.isEmpty, event.sampleIDs.isSubset(of: Set((fixtureSamples + savedSamples).map(\.id))) else {
+            throw HealthAccessError.entryChanged
+        }
+    }
+    func replace(_ event: ConsumptionEvent, with replacement: ConsumptionDraft) async throws {
+        if let saveError { throw saveError }
+        try await delete(event)
+        try await save(replacement)
+    }
+    func delete(_ event: ConsumptionEvent) async throws {
+        try await verifyCurrent(event)
+        saved.removeAll { "event:\($0.id.uuidString)" == event.id }
+        savedSamples.removeAll { event.sampleIDs.contains($0.id) }
+        fixtureSamples.removeAll { event.sampleIDs.contains($0.id) }
     }
     func samples(in range: DateInterval, limitedBy limits: [Nutrient: Date]) async throws -> [HealthSample] {
         if let queryError { throw queryError }
-        return fixtureSamples + saved.flatMap { event in
-            event.nutrition.knownNutrients.map { nutrient in
-                HealthSample(id: UUID(), nutrient: nutrient, value: event.nutrition[nutrient]!, date: event.date,
-                             sourceName: "Tally", sourceBundle: "own", eventID: event.id.uuidString, drinkName: event.name,
-                             isEstimated: event.nutrition.estimated.contains(nutrient))
-            }
-        }
+        return fixtureSamples + savedSamples
     }
     func limitedReadDates() async throws -> [Nutrient: Date] { readLimits }
+
+    private func makeSamples(_ event: ConsumptionDraft) -> [HealthSample] {
+        let total = event.nutrition
+        let nutrients = total.loggableNutrients
+        return nutrients.map { nutrient in
+            HealthSample(id: UUID(), nutrient: nutrient, value: total[nutrient]!, date: event.date,
+                         sourceName: "Tally", sourceBundle: ownBundleIdentifier, eventID: event.id.uuidString,
+                         drinkName: event.name, brand: event.brand, size: event.size, isEstimated: total.estimated.contains(nutrient),
+                         servingQuantity: event.quantity, servingAmount: event.servingAmount, perServingValue: event.perServingNutrition[nutrient],
+                         expectedNutrients: Set(nutrients))
+        }
+    }
 }

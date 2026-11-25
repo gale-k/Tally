@@ -116,7 +116,7 @@ private struct NutrientContributionRow: View {
         .accessibilityElement(children: .combine)
     }
 
-    private var name: some View { Text(event.contributionName).font(.headline) }
+    private var name: some View { HistoryEventName(name: event.contributionName, quantity: event.quantity).font(.headline) }
     private var time: some View {
         Text(DateWindows.format(event.date, as: .dateTime.hour().minute(), calendar: calendar))
             .font(.caption).foregroundStyle(.secondary)

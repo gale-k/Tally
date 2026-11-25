@@ -72,6 +72,13 @@ struct NutritionValues: Codable, Equatable, Sendable {
     var knownNutrients: [Nutrient] { Nutrient.allCases.filter { self[$0] != nil } }
     var isEmpty: Bool { knownNutrients.isEmpty }
 
+    /// Scale known amounts while retaining estimates, explicit zeroes and unknown values.
+    func scaled(by quantity: Double) -> NutritionValues {
+        var result = self
+        for nutrient in knownNutrients { result[nutrient] = self[nutrient].map { $0 * quantity } }
+        return result
+    }
+
     // New Health samples and their write permissions only apply to positive amounts.
     var loggableNutrients: [Nutrient] { Nutrient.allCases.filter { (self[$0] ?? 0) > 0 } }
 
@@ -102,7 +109,7 @@ struct NutritionValues: Codable, Equatable, Sendable {
 }
 
 enum DrinkValidationError: LocalizedError {
-    case nameRequired, noNutrition, invalidNumber(String, Double, String), invalidAmount(ServingAmountUnit), invalidDate
+    case nameRequired, noNutrition, invalidNumber(String, Double, String), invalidAmount(ServingAmountUnit), invalidDate, invalidQuantity, quantityOutOfRange
     var errorDescription: String? {
         switch self {
         case .nameRequired: "Give your item a name."
@@ -111,6 +118,8 @@ enum DrinkValidationError: LocalizedError {
         // The selected unit is retained in validation feedback for both food and drink amounts.
         case let .invalidAmount(unit): "Enter an amount greater than 0 and no more than 100,000 \(unit.rawValue), or leave it blank."
         case .invalidDate: "Choose a valid date and time that is not in the future."
+        case .invalidQuantity: "Enter a number of servings greater than zero."
+        case .quantityOutOfRange: "Choose a quantity that gives a valid total serving size and nutrition."
         }
     }
 }

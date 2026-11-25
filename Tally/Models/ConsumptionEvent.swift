@@ -6,18 +6,31 @@ struct ConsumptionDraft: Sendable {
     let name: String
     let brand: String?
     let size: String?
-    let nutrition: NutritionValues
+    let perServingNutrition: NutritionValues
     let date: Date
+    let quantity: Double
+    let servingAmount: ServingAmount?
+
+    var nutrition: NutritionValues { perServingNutrition.scaled(by: quantity) }
 
     init(id: UUID = UUID(), name: String, brand: String? = nil, size: String? = nil,
-         nutrition: NutritionValues, date: Date = .now) {
+         nutrition: NutritionValues, date: Date = .now, quantity: Double = 1, servingAmount: ServingAmount? = nil) {
         self.id = id; self.name = name; self.brand = brand; self.size = size
-        self.nutrition = nutrition; self.date = date
+        perServingNutrition = nutrition; self.date = date
+        self.quantity = quantity; self.servingAmount = servingAmount ?? ServingAmount(size: size)
     }
     func validate(now: Date = .now) throws {
-        try nutrition.validate()
+        guard ServingQuantity.isValid(quantity) else { throw DrinkValidationError.invalidQuantity }
+        try perServingNutrition.validate()
         // Without a positive amount, HealthKit has no sample to represent this event.
-        guard !nutrition.loggableNutrients.isEmpty else { throw DrinkValidationError.noNutrition }
+        let positiveNutrients = perServingNutrition.loggableNutrients
+        guard !positiveNutrients.isEmpty else { throw DrinkValidationError.noNutrition }
+        // Bounds in the editor apply to one serving. Totals may exceed them but must stay representable.
+        let totals = nutrition
+        guard positiveNutrients.allSatisfy({ ServingQuantity.isValid(totals[$0]!) }),
+              servingAmount.map({ ServingQuantity.isValid($0.value * quantity) }) ?? true else {
+            throw DrinkValidationError.quantityOutOfRange
+        }
         guard date.timeIntervalSince1970.isFinite, date <= now else { throw DrinkValidationError.invalidDate }
     }
 }
@@ -35,6 +48,10 @@ struct HealthSample: Identifiable, Sendable {
     var brand: String?
     var size: String?
     var isEstimated: Bool
+    var servingQuantity: Double? = nil
+    var servingAmount: ServingAmount? = nil
+    var perServingValue: Double? = nil
+    var expectedNutrients: Set<Nutrient>? = nil
 }
 
 struct ConsumptionEvent: Identifiable, Sendable {
@@ -47,6 +64,31 @@ struct ConsumptionEvent: Identifiable, Sendable {
     var isFromTally: Bool
     var nutrition: NutritionValues
     var recordedName: String?
+    var quantity: Double = 1
+    var servingAmount: ServingAmount? = nil
+    var perServingNutrition = NutritionValues()
+    var sampleIDs: Set<UUID> = []
+    var hasCompleteNutrition = false
+
+    var canModify: Bool { isFromTally && hasCompleteNutrition }
+    var canLogAgain: Bool { canModify && !perServingNutrition.loggableNutrients.isEmpty }
+
+    func relogged(at date: Date = .now) throws -> ConsumptionDraft {
+        guard canLogAgain else { throw HealthAccessError.incompleteEntry }
+        return draft(id: UUID(), date: date, quantity: quantity)
+    }
+
+    func withQuantity(_ quantity: Double) throws -> ConsumptionDraft {
+        guard canModify else { throw HealthAccessError.incompleteEntry }
+        // Preserve event identity when available. Older timestamp groups acquire an ID on their first edit.
+        let eventID = id.hasPrefix("event:") ? UUID(uuidString: String(id.dropFirst("event:".count))) : nil
+        return draft(id: eventID ?? UUID(), date: date, quantity: quantity)
+    }
+
+    private func draft(id: UUID, date: Date, quantity: Double) -> ConsumptionDraft {
+        ConsumptionDraft(id: id, name: name, brand: brand, size: size, nutrition: perServingNutrition,
+                         date: date, quantity: quantity, servingAmount: servingAmount)
+    }
 
     // Entries keeps its historical fallback. The drill-down identifies unnamed samples explicitly.
     var contributionName: String {
@@ -114,11 +156,37 @@ enum HealthAggregation {
             let ordered = records.sorted { $0.id.uuidString < $1.id.uuidString }
             let first = ordered[0]
             let own = first.sourceBundle == ownBundle
-            return ConsumptionEvent(id: key, date: first.date,
-                                    name: first.drinkName ?? (own ? "Nutrition entry" : first.nutrient.title),
-                                    brand: own ? first.brand : nil, size: own ? first.size : nil,
-                                    sourceName: first.sourceName, isFromTally: own, nutrition: try totals(records),
-                                    recordedName: first.drinkName)
+            var event = ConsumptionEvent(id: key, date: first.date,
+                                         name: first.drinkName ?? (own ? "Nutrition entry" : first.nutrient.title),
+                                         brand: own ? first.brand : nil, size: own ? first.size : nil,
+                                         sourceName: first.sourceName, isFromTally: own, nutrition: try totals(records),
+                                         recordedName: first.drinkName)
+            if own { addServingDetails(to: &event, records: ordered, first: first) }
+            return event
         }.sorted { $0.date == $1.date ? $0.id < $1.id : $0.date > $1.date }
+    }
+
+    private static func addServingDetails(to event: inout ConsumptionEvent, records: [HealthSample], first: HealthSample) {
+        let nutrients = Set(records.map(\.nutrient))
+        let consistent = nutrients.count == records.count && records.allSatisfy {
+            $0.date == first.date && $0.drinkName == first.drinkName && $0.brand == first.brand && $0.size == first.size
+                && $0.servingQuantity == first.servingQuantity && $0.servingAmount == first.servingAmount
+                && $0.expectedNutrients == first.expectedNutrients
+        }
+        event.sampleIDs = Set(records.map(\.id))
+        event.servingAmount = first.servingAmount ?? ServingAmount(size: first.size)
+        // Legacy samples carry totals for a single serving. New samples store the original per-serving values.
+        guard let quantity = first.servingQuantity else {
+            event.perServingNutrition = event.nutrition
+            event.hasCompleteNutrition = consistent && records.allSatisfy { $0.perServingValue == nil && $0.expectedNutrients == nil }
+            return
+        }
+        guard ServingQuantity.isValid(quantity) else { return }
+        event.quantity = quantity
+        event.perServingNutrition.estimated = event.nutrition.estimated
+        for record in records { event.perServingNutrition[record.nutrient] = record.perServingValue }
+        event.hasCompleteNutrition = consistent && first.expectedNutrients == nutrients && records.allSatisfy {
+            $0.perServingValue.map(ServingQuantity.isValid) ?? false
+        }
     }
 }

@@ -26,11 +26,15 @@ Sodium/salt entry uses one canonical optional `NutritionValues.sodium` value in 
 
 ## Saving a consumption event
 
-Confirmation creates an independent `ConsumptionDraft`, with one UUID and one timestamp. Only positive amounts become `HKQuantitySample`s, and an entry requires at least one. Caffeine and sodium use `gramUnit(with: .milli)`, energy uses `kilocalorie()`, and other supported nutrients use `gram()`.
+Confirmation creates an independent `ConsumptionDraft` with one UUID and timestamp, the per-serving values, and a positive serving multiplier. The same calculation drives the preview and each saved nutrient total, retaining unknown values and estimate flags. Only positive totals become `HKQuantitySample`s, and an entry requires at least one. Caffeine and sodium use `gramUnit(with: .milli)`, energy uses `kilocalorie()`, and other supported nutrients use `gram()`.
 
 The adapter checks Health availability and exposed write authorization for every nutrient with a positive amount. It saves the complete sample array in one call. The installed SDK documents that if any object cannot be saved, none of that array is saved. This avoids silently logging only part of an entry when permissions are incomplete.
 
-Samples use `HKMetadataKeyFoodType` and `HKMetadataKeyWasUserEntered`, plus reverse-DNS custom keys for event ID, brand, size, and that sample’s estimate flag. No local template relationship is required to read the historical event later.
+Samples use `HKMetadataKeyFoodType` and `HKMetadataKeyWasUserEntered`, plus reverse-DNS custom keys for event ID, brand, size, and that sample’s estimate flag. Serving metadata records the multiplier, numeric size per serving when known, the sample's unscaled value, and the set of nutrients written. History reads the scaled amounts directly from Health for totals. It uses the original values for repeat and quantity edits and checks for a complete set before offering those actions. Legacy samples without serving metadata count as one serving. No local template relationship, SwiftData migration, or library export format change is required.
+
+**Log Again** uses the entry’s recorded values and quantity with a new event ID and the current time. **Edit Quantity** keeps the original time and recalculates from the recorded per-serving values. Edits and deletions recheck ownership and sample identities against Health before writing. For new entries, HealthKit’s per-nutrient sync keys support batch replacement with a higher version. [HealthKit sync identifiers](https://developer.apple.com/documentation/healthkit/hkmetadatakeysyncidentifier)
+
+A legacy entry without sync keys needs two HealthKit operations for its first edit. Tally saves the replacements, then deletes the originals. If deletion fails, it attempts to remove the replacements. An interruption between operations or a failed rollback can leave both sets in Health.
 
 After Health succeeds, the local template’s usage count and most recent consumption time are updated. A local save failure cannot undo the successful Health write: the sheet explicitly says the drink was saved to Health, prevents another submission, and reports the local issue. Quick Add uses the same ordering when creating an optional reusable template.
 
@@ -48,7 +52,7 @@ Today, History Entries, Trends, and dated contributions read one refreshed, in-m
 
 The dashboard refreshes after logging, when returning to the foreground, on pull-to-refresh, and on the system significant-time-change notification (including midnight and time-zone changes). A changed local-day window clears the previous daily total before querying, so a failed new-day refresh cannot compare yesterday’s data against today’s target. Refresh generations prevent a stale overlapping response from replacing a newer response. Query failures remain visible alongside any previously refreshed data and its timestamp.
 
-The event-name fallback is now “Nutrition entry” when no food-type metadata is present. Existing names from Health are used verbatim, including historical drinks. Metadata keys, bundle identity, and grouping rules are unchanged.
+The event-name fallback is “Nutrition entry” when no food-type metadata is present. Existing names from Health are used verbatim, including historical drinks. New serving metadata is additive to the existing bundle identity and grouping rules.
 
 ## Library JSON, version 1
 

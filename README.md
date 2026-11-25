@@ -7,7 +7,7 @@ A native iPhone nutrition utility for saving your usual foods and drinks and log
 - Save reusable foods and drinks with favourites, brands, serving sizes, notes, and optional nutrition.
 - Mark items **Homemade** and collect their ingredients and methods in **Library → Recipe Book**.
 - Find a saved item with search, category filters, five sort orders, and ranked Quick Log cards. Archive items you no longer use and restore them from the Library’s Archived view.
-- Review an item and its time before logging, or use Quick Add for a one-off entry.
+- Log one or more servings of a saved item in a single entry, or use Quick Add for a one-off entry.
 - Choose calorie, protein, sugar, caffeine, and sodium summaries on Today.
 - Open **History → Trends** for seven- or 30-day charts for every nutrient. Select a day to see its total and contributing Health entries.
 - Compare nine daily nutrient totals with editable adult references, personal targets, or maximums, with a full Daily Intake breakdown. Tap a nutrient card to see the visible entries contributing to today’s total.
@@ -43,7 +43,13 @@ Calories, protein, sugar, and caffeine are immediately accessible in the editor.
 
 Cards show the known values that best describe each item, so a protein-only food never needs a caffeine placeholder. Configure the Today cards in **Settings → Nutrition on Today**. **Show Sodium** is off until enabled. **View Trends** opens History from Today, and **View trend** on a contribution page opens the corresponding nutrient.
 
-Existing libraries and version-1 JSON exports continue to work. The internal `SavedDrink` type and the JSON `drinks` key retain their original names to preserve compatibility; exported files are now named **Tally Library**. Existing logged drink names and Apple Health metadata remain unchanged.
+Existing libraries and version-1 JSON exports continue to work. The internal `SavedDrink` type and the JSON `drinks` key retain their original names to preserve compatibility; exported files are now named **Tally Library**.
+
+## Logging servings
+
+Tap a food or drink in **Quick Log** or **Library**. The sheet starts at one serving. Use the minus and plus buttons, or tap the number to enter a fraction such as 0.5 or 2.5. The preview updates every known nutrient and shows the total amount when the serving has a size in grams or millilitres. Tap **Log Item** to save one entry for the full quantity.
+
+In **History → Entries**, swipe an entry logged in Tally to reveal **Log Again** and **Edit Quantity**. **Log Again** creates a new entry now using the same quantity and nutrition. **Edit Quantity** changes the existing entry at its original time. The entry detail also offers **Delete Entry**, which removes the corresponding nutrition from Apple Health. Entries logged before the quantity selector count as one serving. These actions use the nutrition recorded when the item was logged, so they still work if you later edit or delete the saved template.
 
 ## Data and privacy
 

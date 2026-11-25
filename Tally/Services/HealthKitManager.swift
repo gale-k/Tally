@@ -38,17 +38,59 @@ final class HealthKitManager {
     }
 
     func log(_ event: ConsumptionDraft) async throws {
-        guard !isSaving else { throw HealthAccessError.alreadySaving }
-        guard isAvailable else { throw HealthAccessError.unavailable }
+        try await performWrite {
+            try await authorizeWrite(for: event)
+            try await client.save(event)
+        }
+    }
+
+    func logAgain(_ event: ConsumptionEvent) async throws {
+        try await performWrite {
+            // Confirm the selected snapshot still exists before creating the independent entry.
+            try await client.verifyCurrent(event)
+            let repeated = try event.relogged()
+            try await authorizeWrite(for: repeated)
+            try await client.save(repeated)
+        }
+    }
+
+    func updateQuantity(_ event: ConsumptionEvent, quantity: Double) async throws {
+        try await performWrite {
+            let replacement = try event.withQuantity(quantity)
+            try await authorizeWrite(for: replacement)
+            try await client.replace(event, with: replacement)
+        }
+    }
+
+    func delete(_ event: ConsumptionEvent) async throws {
+        try await performWrite { try await client.delete(event) }
+    }
+
+    private func authorizeWrite(for event: ConsumptionDraft) async throws {
         try event.validate()
-        isSaving = true
-        defer { isSaving = false }
-        // An existing user may have reviewed permissions before a newly supported nutrient was added.
-        // Only the nutrients being written can reopen the permission sheet on first use.
+        // A previously undecided nutrient can reopen Health permissions only when it is being written.
         if !permissionsRequested || event.nutrition.loggableNutrients.contains(where: { client.writeStatus(for: $0) == .notRequested }) {
             try await requestAccess()
         }
-        try await client.save(event)
+    }
+
+    private func performWrite(_ operation: () async throws -> Void) async throws {
+        guard !isSaving else { throw HealthAccessError.alreadySaving }
+        guard isAvailable else { throw HealthAccessError.unavailable }
+        isSaving = true
+        defer { isSaving = false }
+        do {
+            try await operation()
+        } catch {
+            // A stale row or interrupted legacy replacement can leave Health different from the visible snapshot.
+            if let error = error as? HealthAccessError {
+                switch error {
+                case .entryChanged, .incompleteEntry, .reconciliationFailed: await refresh()
+                default: break
+                }
+            }
+            throw error
+        }
         await refresh()
     }
 

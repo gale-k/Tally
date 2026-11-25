@@ -110,7 +110,8 @@ final class DailyIntakeTests: XCTestCase {
     func testMidnightDropsYesterdayOnFailureAndRefreshRecovers() async throws {
         let store = FakeNutritionStore()
         let date = Calendar.current.startOfDay(for: .now).addingTimeInterval(60)
-        store.saved = [.init(name: "Protein", nutrition: .init(protein: 25, estimated: [.protein]), date: date)]
+        store.fixtureSamples = [HealthSample(id: UUID(), nutrient: .protein, value: 25, date: date,
+                                            sourceName: "Tally", sourceBundle: "own", isEstimated: true)]
         let manager = HealthKitManager(client: store, defaults: nil)
         try await manager.requestAccess()
         await manager.refresh(now: date.addingTimeInterval(60))
@@ -128,7 +129,9 @@ final class DailyIntakeTests: XCTestCase {
         XCTAssertTrue(manager.todayEvents.isEmpty)
         XCTAssertNotNil(manager.queryError)
         store.queryError = nil
-        store.saved.append(.init(name: "Zero", nutrition: .init(protein: 0), date: tomorrow))
+        // The zero is an existing Health sample. New writes omit zeros.
+        store.fixtureSamples.append(HealthSample(id: UUID(), nutrient: .protein, value: 0, date: tomorrow,
+                                                sourceName: "Tally", sourceBundle: "own", isEstimated: false))
         await manager.refresh(now: tomorrow.addingTimeInterval(60))
         XCTAssertEqual(manager.today.protein, 0)
         XCTAssertEqual(manager.todayEvents.count, 1)
