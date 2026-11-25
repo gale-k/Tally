@@ -50,6 +50,100 @@ final class TallyUITests: XCTestCase {
         XCTAssertFalse(app.buttons["confirmLogDrink"].isEnabled)
     }
 
+    /// The separate editor stages text only on Done. Saved recipes remain searchable after archiving.
+    func testRecipeBookFromLibraryItem() throws { try verifyRecipeBook() }
+    func testRecipeBookWithLargeText() throws { try verifyRecipeBook(["--dark-mode", "--large-text"]) }
+
+    private func verifyRecipeBook(_ arguments: [String] = []) throws {
+        let app = launch(arguments)
+        let itemName = "Berry Bowl"
+        let item = app.buttons["drink.\(itemName)"]
+        let actions = app.buttons["More actions for \(itemName)"]
+        let book = app.buttons["openRecipeBook"]
+        let recipe = app.buttons["recipe.\(itemName)"]
+        let openEditor = app.buttons["openRecipeEditor"]
+        let recipeWindow = app.navigationBars["Recipe"]
+        let ingredients = app.textFields["recipeIngredients"]
+        let method = app.textFields["recipeMethod"]
+        app.tabBars.buttons["Library"].tap()
+        app.buttons["addDrink"].tap()
+        let name = app.textFields["drinkName"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        name.tap(); name.typeText(itemName)
+        let homemade = app.switches["homemade"]
+        reveal(homemade, in: app)
+        homemade.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+        XCTAssertEqual(homemade.value as? String, "1")
+        reveal(openEditor, in: app)
+        XCTAssertEqual(openEditor.label, "Add Recipe")
+        XCTAssertFalse(ingredients.exists)
+        openEditor.tap()
+        XCTAssertTrue(recipeWindow.waitForExistence(timeout: 5))
+        reveal(ingredients, in: app)
+        ingredients.tap(); ingredients.typeText("Draft only")
+        recipeWindow.buttons["Cancel"].tap()
+        XCTAssertTrue(recipeWindow.waitForNonExistence(timeout: 5))
+        app.buttons["saveDrink"].tap()
+        XCTAssertTrue(item.waitForExistence(timeout: 5))
+        XCTAssertTrue(item.label.contains("Homemade"))
+        reveal(book, in: app); book.tap()
+        XCTAssertTrue(app.staticTexts["No recipes yet"].waitForExistence(timeout: 5))
+        app.navigationBars["Recipe Book"].buttons.firstMatch.tap()
+
+        reveal(actions, in: app)
+        actions.tap()
+        app.buttons["Edit Item"].tap()
+        reveal(openEditor, in: app); openEditor.tap()
+        XCTAssertTrue(recipeWindow.waitForExistence(timeout: 5))
+        try app.performAccessibilityAudit(for: [.sufficientElementDescription])
+        reveal(ingredients, in: app)
+        ingredients.tap(); ingredients.typeText("80 g oats\n150 ml milk")
+        reveal(method, in: app)
+        method.tap(); method.typeText("Mix and chill.")
+        capture(arguments.isEmpty ? "Recipe-Editor" : "Recipe-Editor-Dark-LargeText", app)
+        app.buttons["doneRecipe"].tap()
+        XCTAssertTrue(recipeWindow.waitForNonExistence(timeout: 5))
+        reveal(openEditor, in: app)
+        XCTAssertEqual(openEditor.label, "Edit Recipe")
+        app.buttons["saveDrink"].tap()
+        reveal(book, in: app); book.tap()
+        XCTAssertTrue(recipe.waitForExistence(timeout: 5))
+        recipe.tap()
+        XCTAssertTrue(app.navigationBars[itemName].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "80 g oats", "150 ml milk")).firstMatch.exists)
+        XCTAssertTrue(app.staticTexts["Mix and chill."].exists)
+        capture(arguments.isEmpty ? "Recipe-Detail" : "Recipe-Detail-Dark-LargeText", app)
+        try app.performAccessibilityAudit(for: [.sufficientElementDescription])
+
+        // Done updates the item draft, so cancelling Edit Item still leaves the book unchanged.
+        app.buttons["editRecipeItem"].tap()
+        reveal(openEditor, in: app); openEditor.tap()
+        XCTAssertTrue(recipeWindow.waitForExistence(timeout: 5))
+        reveal(method, in: app)
+        XCTAssertEqual(method.value as? String, "Mix and chill.")
+        method.tap(); method.typeText(" Do not save this.")
+        app.buttons["doneRecipe"].tap()
+        XCTAssertTrue(recipeWindow.waitForNonExistence(timeout: 5))
+        app.navigationBars["Edit Item"].buttons["Cancel"].tap()
+        XCTAssertTrue(app.staticTexts["Mix and chill."].waitForExistence(timeout: 5))
+        app.navigationBars[itemName].buttons.firstMatch.tap()
+        app.navigationBars["Recipe Book"].buttons.firstMatch.tap()
+
+        reveal(actions, in: app)
+        actions.tap()
+        app.buttons["Archive Item"].tap()
+        XCTAssertTrue(item.waitForNonExistence(timeout: 5))
+        reveal(book, in: app); book.tap()
+        XCTAssertTrue(recipe.waitForExistence(timeout: 5))
+        XCTAssertTrue(recipe.label.contains("Archived"))
+        if arguments.isEmpty { capture("Recipe-Book", app) }
+        let search = app.searchFields.firstMatch
+        search.tap(); search.typeText("oats")
+        XCTAssertTrue(recipe.exists)
+        search.typeText("xyz")
+        XCTAssertTrue(recipe.waitForNonExistence(timeout: 5))
+    }
+
     /// The editor must persist both units and Cold, including the stacked accessibility layout.
     func testServingAmountUnitsAndColdPersistInEditor() {
         verifyServingAmountEditor()

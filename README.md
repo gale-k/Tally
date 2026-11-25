@@ -5,6 +5,7 @@ A native iPhone nutrition utility for saving your usual foods and drinks and log
 ## What it does
 
 - Save reusable foods and drinks with favourites, brands, serving sizes, notes, and optional nutrition.
+- Mark items **Homemade** and collect their ingredients and methods in **Library → Recipe Book**.
 - Find a saved item with search, category filters, five sort orders, and ranked Quick Log cards. Archive items you no longer use and restore them from the Library’s Archived view.
 - Review an item and its time before logging, or use Quick Add for a one-off entry.
 - Choose calorie, protein, sugar, caffeine, and sodium summaries on Today.
@@ -36,6 +37,8 @@ In Debug builds, **Settings → Development → Add Development Examples** inser
 
 A name is the only required template field. Serving size is free text (for example, “1 bowl” or “330 ml”); amount and serving style are optional. **Amount** can be entered in **ml** or **g**; changing the unit keeps the entered number without converting between volume and weight. Serving styles include **Cold** separately from **Iced**. New items start with no specified style. Food categories sit alongside the existing coffee, tea, pod, and bottled-drink options.
 
+In **Add Item** or **Edit Item**, turn on **Homemade**, then tap **Add Recipe** to open the recipe editor. Enter ingredients, a method, or both. Tap **Done** to return to the item, then **Save**. Open **Library → Recipe Book** to find recipes by name or ingredient, read them, and edit their items. The book keeps recipes from archived items and items you later unmark as Homemade. To remove a recipe while keeping its item, clear both recipe fields and save. Deleting the item also deletes its recipe.
+
 Calories, protein, sugar, and caffeine are immediately accessible in the editor. Carbohydrates, fats, fibre, and sodium/salt are under **More Nutrition**. Choose **Sodium (mg)** or **Salt (g)** to match the label; switching converts the entered amount. Salt uses the [food-label conversion](https://www.foodstandards.gov.scot/consumer-advice/healthy-eating/balanced-diet/understanding-nutrients/salt): 1 g salt = 400 mg sodium. Tally stores and logs one sodium value to Apple Health, and saved items reopen in sodium mg. First use requests any newly needed Health write permission.
 
 Cards show the known values that best describe each item, so a protein-only food never needs a caffeine placeholder. Configure the Today cards in **Settings → Nutrition on Today**. **Show Sodium** is off until enabled. **View Trends** opens History from Today, and **View trend** on a contribution page opens the corresponding nutrient.
@@ -44,7 +47,7 @@ Existing libraries and version-1 JSON exports continue to work. The internal `Sa
 
 ## Data and privacy
 
-Reusable food and drink templates remain available in this device’s SwiftData store. Optional iCloud sync sends template details, including nutrition, notes, favourites, and archive state, to your private CloudKit database after confirmation in Settings. Actual consumption is saved as independent HealthKit samples and queried from Apple Health. Editing, archiving, or deleting a template never changes historical samples.
+Reusable food and drink templates remain available in this device’s SwiftData store. Optional iCloud sync sends template details, including nutrition, recipes, notes, favourites, and archive state, to your private CloudKit database after confirmation in Settings. Recipes are also included in library snapshots. Actual consumption is saved as independent HealthKit samples and queried from Apple Health. Editing, archiving, or deleting a template never changes historical samples.
 
 Today’s totals and history show **visible Apple Health nutrition from all sources**, including other apps and foods. They are not presented as drinks-only totals. Empty results cannot establish whether read permission was denied. Limited-history access is respected. Nutrient breakdowns include visible entries from all sources; some may have no food name. Pull to refresh, or return to Tally after changing data or permissions in Health.
 

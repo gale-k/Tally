@@ -213,6 +213,34 @@ final class SyncTests: XCTestCase {
         try LibrarySyncStore.receive(next, systemFields: nil, in: context); try context.save()
         XCTAssertTrue(item.isArchived); XCTAssertEqual(item.timesLogged, 4)
     }
+    /// Recipe edits transfer through the existing outbox and update an existing item without changing local usage.
+    func testRecipeSyncAppliesAndClearsFields() throws {
+        let sender = try store()
+        let receiver = try store()
+        var draft = DrinkDraft()
+        draft.name = "Porridge"; draft.isHomemade = true
+        draft.recipeIngredients = "Oats\nMilk"
+        draft.recipeMethod = "Simmer."
+        let item = try DrinkLibrary.save(draft, in: sender.mainContext)
+        let peer = SavedDrink(id: item.id, name: "Porridge", timesLogged: 4)
+        receiver.mainContext.insert(peer); try receiver.mainContext.save()
+        let state = try XCTUnwrap(LibrarySyncStore.state(for: item.id, in: sender.mainContext))
+        let incoming = try LibrarySyncStore.change(state)
+        try LibrarySyncStore.receive(incoming, systemFields: nil, in: receiver.mainContext)
+        try receiver.mainContext.save()
+        XCTAssertEqual(SavedDrinkRecord(peer), SavedDrinkRecord(item))
+        XCTAssertTrue(peer.hasRecipe)
+
+        draft.isHomemade = false
+        draft.recipeIngredients = " "
+        draft.recipeMethod = ""
+        try DrinkLibrary.save(draft, editing: item, in: sender.mainContext)
+        try LibrarySyncStore.receive(LibrarySyncStore.change(state), systemFields: nil, in: receiver.mainContext)
+        try receiver.mainContext.save()
+        XCTAssertFalse(peer.isHomemade)
+        XCTAssertFalse(peer.hasRecipe)
+        XCTAssertEqual(peer.timesLogged, 4)
+    }
     func testNewerLocalEditAndStaleAcknowledgementStayPending() throws {
         let container = try store(); let context = container.mainContext
         let item = SavedDrink(name: "Original"); context.insert(item)
@@ -273,7 +301,8 @@ final class SyncTests: XCTestCase {
     func testCloudRecordRoundTripAndAssetPayloadExcludesUsage() throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("TallyCloudCodec-\(UUID())")
         defer { try? FileManager.default.removeItem(at: folder) }
-        let item = SavedDrink(name: "Food", category: .meal, nutrition: .init(caffeine: 0, calories: 250, protein: 18, estimated: [.protein]), lastLoggedAt: .now, timesLogged: 12)
+        let item = SavedDrink(name: "Food", category: .meal, nutrition: .init(caffeine: 0, calories: 250, protein: 18, estimated: [.protein]),
+                              isHomemade: true, recipeIngredients: "Beans\nTomatoes", recipeMethod: "Simmer.", lastLoggedAt: .now, timesLogged: 12)
         let original = change(item, date: .now)
         let record = try CloudTemplateCodec.record(for: original, systemFields: nil, assetDirectory: folder)
         XCTAssertEqual(try CloudTemplateCodec.change(from: record), original)
@@ -294,8 +323,10 @@ final class SyncTests: XCTestCase {
     }
     func testSnapshotRestoreCopiesKeepsCurrentTemplatesAndResetsUsage() throws {
         let container = try store(); let context = container.mainContext
-        let item = SavedDrink(name: "Old", nutrition: .init(caffeine: 100, estimated: [.caffeine]), timesLogged: 9)
+        let item = SavedDrink(name: "Old", nutrition: .init(caffeine: 100, estimated: [.caffeine]),
+                              isHomemade: true, recipeMethod: "Steep for three minutes.", timesLogged: 9)
         let snapshot = try DrinkExportService.export([item])
+        item.recipeMethod = "Steep for four minutes."
         item.name = "Current"; item.caffeineMg = 110; context.insert(item); try context.save()
         let report = try DrinkExportService.importDrinks(snapshot, into: context, mode: .restoreCopies)
         XCTAssertTrue(report.restoredCopies); XCTAssertEqual(report.imported, 1)
@@ -303,6 +334,9 @@ final class SyncTests: XCTestCase {
         XCTAssertEqual(items.count, 2)
         let copy = try XCTUnwrap(items.first { $0.id != item.id })
         XCTAssertEqual(copy.name, "Old"); XCTAssertEqual(copy.caffeineMg, 100)
+        XCTAssertTrue(copy.isHomemade)
+        XCTAssertEqual(copy.recipeMethod, "Steep for three minutes.")
+        XCTAssertEqual(item.recipeMethod, "Steep for four minutes.")
         XCTAssertEqual(item.name, "Current"); XCTAssertEqual(item.timesLogged, 9)
         XCTAssertEqual(copy.timesLogged, 0); XCTAssertNil(copy.lastLoggedAt)
         XCTAssertTrue(try XCTUnwrap(LibrarySyncStore.state(for: copy.id, in: context)).needsUpload)
@@ -323,6 +357,8 @@ final class SyncTests: XCTestCase {
         let upgraded = try LibraryStore.container(configuration: configuration)
         let item = try XCTUnwrap(upgraded.mainContext.fetch(FetchDescriptor<SavedDrink>()).first)
         XCTAssertFalse(item.isArchived)
+        XCTAssertFalse(item.isHomemade)
+        XCTAssertFalse(item.hasRecipe)
         XCTAssertEqual(item.id, id); XCTAssertEqual(item.caffeineMg, 0); XCTAssertNil(item.caloriesKcal)
         XCTAssertEqual(item.nutrition.estimated, [.caffeine]); XCTAssertTrue(item.isFavourite)
         XCTAssertEqual(item.timesLogged, 12); XCTAssertEqual(item.lastLoggedAt, logged); XCTAssertEqual(item.servingStyle, .iced)
@@ -423,8 +459,14 @@ final class SyncTests: XCTestCase {
     }
 
     func testSnapshotDecodePerformance() throws {
-        // A realistic larger template library exercises optional values, estimates, dates, and notes during backup recovery.
-        let data = try DrinkExportService.export((0..<500).map { SavedDrink(name: "Food \($0)", nutrition: .init(calories: 250, protein: 18, estimated: [.protein]), notes: String(repeating: "Serving note. ", count: 20)) })
+        // Include a mix of templates with and without recipe text in the backup recovery measurement.
+        let items = (0..<500).map { index in
+            let homemade = index.isMultiple(of: 3)
+            return SavedDrink(name: "Food \(index)", nutrition: .init(calories: 250, protein: 18, estimated: [.protein]),
+                              notes: String(repeating: "Serving note. ", count: 20), isHomemade: homemade,
+                              recipeIngredients: homemade ? "Beans\nTomatoes\nOlive oil" : nil, recipeMethod: homemade ? "Simmer and serve." : nil)
+        }
+        let data = try DrinkExportService.export(items)
         measure { do { _ = try DrinkExportService.decode(data) } catch { XCTFail(error.localizedDescription) } }
     }
 }

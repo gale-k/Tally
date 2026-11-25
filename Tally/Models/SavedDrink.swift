@@ -79,6 +79,10 @@ final class SavedDrink {
     var isFavourite: Bool
     // Optional storage allows existing SwiftData stores to migrate with active items.
     var archivedState: Bool?
+    // Optional fields let existing stores migrate and keep the Homemade label independent of recipe text.
+    var homemadeState: Bool?
+    var recipeIngredients: String?
+    var recipeMethod: String?
     var createdAt: Date
     var updatedAt: Date
     var lastLoggedAt: Date?
@@ -87,6 +91,7 @@ final class SavedDrink {
     init(id: UUID = UUID(), name: String, brandOrLocation: String? = nil, size: String? = nil,
          volumeMl: Double? = nil, weightG: Double? = nil, category: DrinkCategory = .other, servingStyle: ServingStyle = .other,
          nutrition: NutritionValues = .init(), notes: String? = nil, isFavourite: Bool = false,
+         isHomemade: Bool = false, recipeIngredients: String? = nil, recipeMethod: String? = nil,
          createdAt: Date = .now, updatedAt: Date = .now, lastLoggedAt: Date? = nil, timesLogged: Int = 0) {
         self.id = id
         self.name = name
@@ -108,6 +113,9 @@ final class SavedDrink {
         estimatedNutrients = nutrition.estimated.map(\.rawValue).sorted()
         self.notes = notes
         self.isFavourite = isFavourite
+        homemadeState = isHomemade
+        self.recipeIngredients = recipeIngredients
+        self.recipeMethod = recipeMethod
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.lastLoggedAt = lastLoggedAt
@@ -119,6 +127,12 @@ final class SavedDrink {
         get { archivedState ?? false }
         set { archivedState = newValue }
     }
+    var isHomemade: Bool {
+        get { homemadeState ?? false }
+        set { homemadeState = newValue }
+    }
+    // An item can be marked Homemade before its recipe is written.
+    var hasRecipe: Bool { recipeIngredients != nil || recipeMethod != nil }
     var category: DrinkCategory { DrinkCategory(rawValue: categoryRaw) ?? .other }
     var servingStyle: ServingStyle { ServingStyle(rawValue: servingStyleRaw) ?? .other }
     var nutrition: NutritionValues {

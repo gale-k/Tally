@@ -8,6 +8,7 @@ struct AddEditDrinkView: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     private let drink: SavedDrink?
     @State private var draft: DrinkDraft
+    @State private var showingRecipeEditor = false
     @State private var error: String?
 
     init(drink: SavedDrink? = nil) {
@@ -33,6 +34,13 @@ struct AddEditDrinkView: View {
                     ForEach(ServingStyle.allCases) { Text($0.title).tag($0) }
                 }.accessibilityIdentifier("servingStyle")
                 Toggle("Favourite", isOn: $draft.isFavourite)
+                Toggle("Homemade", isOn: $draft.isHomemade).accessibilityIdentifier("homemade")
+                // Keep recipe text reachable after turning off the item's Homemade label.
+                if draft.isHomemade || hasDraftRecipe {
+                    Button { showingRecipeEditor = true } label: {
+                        Label(hasDraftRecipe ? "Edit Recipe" : "Add Recipe", systemImage: "book")
+                    }.accessibilityIdentifier("openRecipeEditor")
+                }
             }
             NutritionFormSection(draft: $draft)
             Section("Notes") { TextField("Anything worth remembering", text: $draft.notes, axis: .vertical).lineLimit(3...6) }
@@ -51,8 +59,16 @@ struct AddEditDrinkView: View {
                 }.fontWeight(.semibold).accessibilityIdentifier("saveDrink")
             }
         }
+        .sheet(isPresented: $showingRecipeEditor) {
+            RecipeEditorView(ingredients: $draft.recipeIngredients, method: $draft.recipeMethod)
+        }
         .errorAlert($error, title: "Couldn’t save item")
     }
+
+    private var hasDraftRecipe: Bool {
+        DrinkDraft.optionalText(draft.recipeIngredients) != nil || DrinkDraft.optionalText(draft.recipeMethod) != nil
+    }
+
     // A menu keeps both measurement choices available without converting the entered number.
     private var amountInput: some View {
         HStack {

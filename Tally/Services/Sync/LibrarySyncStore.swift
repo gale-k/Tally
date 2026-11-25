@@ -149,6 +149,10 @@ enum LibrarySyncStore {
         item.nutrition = record.nutrition; item.notes = record.notes; item.isFavourite = record.isFavourite
         // A payload from an older client has no archive field and represents an active template.
         item.isArchived = record.isArchived ?? false
+        // Recipes follow whole-template revisions, including when a newer revision clears either field.
+        item.isHomemade = record.isHomemade ?? false
+        item.recipeIngredients = DrinkDraft.optionalText(record.recipeIngredients)
+        item.recipeMethod = DrinkDraft.optionalText(record.recipeMethod)
         item.createdAt = record.createdAt; item.updatedAt = record.updatedAt
     }
 }

@@ -21,6 +21,10 @@ struct DrinkDraft {
     var category: DrinkCategory = .other
     var servingStyle: ServingStyle = .other
     var isFavourite = false
+    // Recipe text stays in the draft when the Homemade toggle changes.
+    var isHomemade = false
+    var recipeIngredients = ""
+    var recipeMethod = ""
     var notes = ""
     var values: [Nutrient: String] = [:]
     var estimated: Set<Nutrient> = []
@@ -35,13 +39,17 @@ struct DrinkDraft {
         amount = (drink.weightG ?? drink.volumeMl).map { String($0) } ?? ""
         category = drink.category; servingStyle = drink.servingStyle
         isFavourite = drink.isFavourite; notes = drink.notes ?? ""
+        isHomemade = drink.isHomemade
+        recipeIngredients = drink.recipeIngredients ?? ""
+        recipeMethod = drink.recipeMethod ?? ""
         for nutrient in drink.nutrition.knownNutrients { values[nutrient] = drink.nutrition[nutrient].map { String($0) } }
         estimated = drink.nutrition.estimated
     }
 
-    static func optionalText(_ text: String) -> String? {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
+    static func optionalText(_ text: String?) -> String? {
+        // Preserve internal line breaks in recipe text and discard whitespace-only fields.
+        guard let trimmed = text?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else { return nil }
+        return trimmed
     }
 
     // Reject malformed text instead of silently turning an invalid entry into an unknown value.
@@ -103,7 +111,9 @@ struct DrinkDraft {
         return SavedDrink(name: name.trimmingCharacters(in: .whitespacesAndNewlines), brandOrLocation: Self.optionalText(brand),
                           size: Self.optionalText(size), volumeMl: amountUnit == .millilitres ? amount : nil,
                           weightG: amountUnit == .grams ? amount : nil, category: category,
-                          servingStyle: servingStyle, nutrition: try nutrition(), notes: Self.optionalText(notes), isFavourite: isFavourite)
+                          servingStyle: servingStyle, nutrition: try nutrition(), notes: Self.optionalText(notes), isFavourite: isFavourite,
+                          isHomemade: isHomemade, recipeIngredients: Self.optionalText(recipeIngredients),
+                          recipeMethod: Self.optionalText(recipeMethod))
     }
 
     func apply(to drink: SavedDrink) throws {
@@ -116,6 +126,9 @@ struct DrinkDraft {
         drink.weightG = amountUnit == .grams ? amount : nil
         drink.categoryRaw = category.rawValue
         drink.servingStyleRaw = servingStyle.rawValue; drink.isFavourite = isFavourite
+        drink.isHomemade = isHomemade
+        drink.recipeIngredients = Self.optionalText(recipeIngredients)
+        drink.recipeMethod = Self.optionalText(recipeMethod)
         drink.notes = Self.optionalText(notes); drink.nutrition = try nutrition(); drink.updatedAt = .now
     }
 }

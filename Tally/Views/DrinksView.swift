@@ -24,6 +24,11 @@ struct DrinksView: View {
 
     var body: some View {
         List {
+            // Recipe Book has its own search and includes recipes from both Library scopes.
+            Section {
+                NavigationLink { RecipeBookView() } label: { Label("Recipe Book", systemImage: "book") }
+                    .accessibilityIdentifier("openRecipeBook")
+            }
             // Keep the archive accessible alongside the same search, filter and sort controls.
             Section {
                 Picker("Library items", selection: $showingArchive) {
@@ -101,7 +106,10 @@ struct DrinksView: View {
                 perform { try DrinkLibrary.delete(item, in: context) }
                 deleting = nil
             }
-        } message: { _ in Text("Nutrition already saved to Apple Health will stay there.") }
+        } message: { item in
+            if item.hasRecipe { Text("This also deletes its recipe from Recipe Book. Nutrition already saved to Apple Health will stay there.") }
+            else { Text("Nutrition already saved to Apple Health will stay there.") }
+        }
         .errorAlert($error)
     }
     // Distinguish an empty collection from filters hiding otherwise available items.

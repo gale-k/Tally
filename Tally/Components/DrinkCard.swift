@@ -68,6 +68,8 @@ struct DrinkRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 if let brand = drink.brandOrLocation { Text(brand).font(.caption).foregroundStyle(.secondary) }
                 Text(drink.name).font(.headline).foregroundStyle(.primary)
+                // Keep the label with the item name so it also wraps at accessibility sizes.
+                if drink.isHomemade { Label("Homemade", systemImage: "house").font(.caption).foregroundStyle(.secondary) }
                 if let size = drink.size { Text(size).font(.caption).foregroundStyle(.secondary) }
                 if typeSize.isAccessibilitySize { NutritionSummaryView(nutrition: drink.nutrition, compact: true) }
             }

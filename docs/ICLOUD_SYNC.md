@@ -2,7 +2,7 @@
 
 ## What syncs
 
-Sync is off by default. In **Settings → iCloud Library**, choose **Enable iCloud Sync** and confirm the merge. Tally uses Apple’s CloudKit private database for the signed-in iCloud account; no Tally account or custom server is involved. Saved food/drink identities, names, brand/location, serving details, all known nutrition, estimate markers, notes, favourites, archive state, and template creation/edit dates are included. Blank amounts stay unknown and explicit zeroes stay zero.
+Sync is off by default. In **Settings → iCloud Library**, choose **Enable iCloud Sync** and confirm the merge. Tally uses Apple’s CloudKit private database for the signed-in iCloud account; no Tally account or custom server is involved. Saved food/drink identities, names, brand/location, serving details, all known nutrition, estimate markers, notes, favourites, archive state, Homemade status, recipes, and template creation/edit dates are included. Blank amounts stay unknown and explicit zeroes stay zero.
 
 Archiving and unarchiving are ordinary synced template edits, not deletion markers. Older payloads without archive state are treated as active. Archived items remain editable in Library and do not appear in Quick Log.
 
@@ -20,6 +20,8 @@ Health history remains in Apple Health, subject to Apple Health’s own system s
 ## Conflicts, deletions, and duplicate identities
 
 The UUID identifies a template across devices. Retrying the same revision does not create a second item. Concurrent changes resolve at the whole-template level: the later edit timestamp wins; an exact timestamp tie favours deletion, then a stable lexical revision-UUID order. There is no field-by-field merge or conflict-version browser. Device clock differences can affect which concurrent edit wins; keep snapshots when you want independent recovery.
+
+Recipe details are part of the item revision. An edit from an older Tally version can replace the item with a revision that omits its recipe. Library snapshots include whatever recipe fields were present when exported.
 
 A local change always sorts after the revision that device has already received. Initial connection preserves original edit ordering rather than treating every existing item as newly edited. A later upload acknowledgement cannot clear an even newer offline edit.
 

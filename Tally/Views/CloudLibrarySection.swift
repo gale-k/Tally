@@ -29,7 +29,7 @@ struct CloudLibrarySection: View {
             }
         } header: { Text("iCloud Library") }
         footer: {
-            Text("Optional private iCloud storage for saved templates, including nutrition, notes and favourites. Usage counts, Health permissions and preferences stay local. Consumption history stays in Apple Health. Sync propagates deletions; it is not an independent backup.")
+            Text("Optional private iCloud storage for saved templates, including nutrition, recipes, notes and favourites. Usage counts, Health permissions and preferences stay local. Consumption history stays in Apple Health. Sync propagates deletions; it is not an independent backup.")
         }
         .confirmationDialog("Enable iCloud Library Sync?", isPresented: $enabling, titleVisibility: .visible) {
             Button("Enable Sync") { Task { await sync.enable() } }

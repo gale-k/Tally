@@ -6,7 +6,9 @@ import SwiftData
 final class ExportTests: XCTestCase {
     func testJSONRoundTripPreservesTemplatesAndExcludesConsumption() throws {
         let original = SavedDrink(name: "Chai", brandOrLocation: "Fuel", volumeMl: 330, category: .teaChai,
-                                  nutrition: .init(caffeine: 0, estimated: [.caffeine]), isFavourite: true, lastLoggedAt: .now, timesLogged: 9)
+                                  nutrition: .init(caffeine: 0, estimated: [.caffeine]), isFavourite: true,
+                                  isHomemade: true, recipeIngredients: "Tea\nSpices", recipeMethod: "Simmer for 5 minutes.",
+                                  lastLoggedAt: .now, timesLogged: 9)
         original.isArchived = true
         let data = try DrinkExportService.export([original])
         let json = try XCTUnwrap(String(data: data, encoding: .utf8))
@@ -17,6 +19,10 @@ final class ExportTests: XCTestCase {
         XCTAssertEqual(restored.nutrition, original.nutrition)
         XCTAssertTrue(restored.isFavourite)
         XCTAssertTrue(restored.isArchived)
+        // Recipe text survives the same version-1 transfer as the rest of its item.
+        XCTAssertTrue(restored.isHomemade)
+        XCTAssertEqual(restored.recipeIngredients, original.recipeIngredients)
+        XCTAssertEqual(restored.recipeMethod, original.recipeMethod)
         XCTAssertEqual(restored.timesLogged, 0)
         XCTAssertNil(restored.caloriesKcal)
     }
@@ -76,6 +82,8 @@ final class ExportTests: XCTestCase {
         XCTAssertEqual(item.nutrition.formatted(.caffeine), "~100 mg")
         XCTAssertTrue(item.isFavourite)
         XCTAssertFalse(item.isArchived)
+        XCTAssertFalse(item.isHomemade)
+        XCTAssertFalse(item.hasRecipe)
         XCTAssertNil(item.proteinG)
         // Older snapshots do not invent a sodium amount when the optional key is absent.
         XCTAssertNil(item.sodiumMg)

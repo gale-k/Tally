@@ -10,6 +10,10 @@ final class LibraryTests: XCTestCase {
         context.autosaveEnabled = false
         var draft = DrinkDraft()
         draft.name = "Mocha"; draft.values[.caffeine] = "100"
+        // Duplicating an item copies its recipe as independently editable text.
+        draft.isHomemade = true
+        draft.recipeIngredients = "Espresso\nMilk"
+        draft.recipeMethod = "Stir together."
         let original = try DrinkLibrary.save(draft, in: context)
         try DrinkLibrary.recordLog(for: original, at: .now, in: context)
         try DrinkLibrary.toggleFavourite(original, in: context)
@@ -20,8 +24,16 @@ final class LibraryTests: XCTestCase {
         XCTAssertEqual(copy.caffeineMg, 100)
         XCTAssertEqual(copy.timesLogged, 0)
         XCTAssertNil(copy.lastLoggedAt)
+        XCTAssertTrue(copy.isHomemade)
+        XCTAssertEqual(copy.recipeIngredients, "Espresso\nMilk")
         draft.values[.caffeine] = "110"
+        draft.isHomemade = false
+        draft.recipeMethod = " \n "
         try DrinkLibrary.save(draft, editing: original, in: context)
+        XCTAssertFalse(original.isHomemade)
+        XCTAssertTrue(original.hasRecipe)
+        XCTAssertNil(original.recipeMethod)
+        XCTAssertEqual(copy.recipeMethod, "Stir together.")
         XCTAssertEqual(copy.caffeineMg, 100)
         try DrinkLibrary.delete(original, in: context)
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<SavedDrink>()), 1)
@@ -68,19 +80,27 @@ final class LibraryTests: XCTestCase {
         XCTAssertNil(try LibrarySyncStore.state(for: item.id, in: context))
     }
 
-    /// Archive state survives reopening the actual on-disk store.
-    func testArchiveSurvivesStoreReopen() throws {
+    /// Archive state and the recipe survive reopening the actual on-disk store.
+    func testArchivedRecipeSurvivesStoreReopen() throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("TallyArchive-\(UUID())")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
         let configuration = ModelConfiguration(url: folder.appendingPathComponent("Library.store"), cloudKitDatabase: .none)
         do {
             let container = try LibraryStore.container(configuration: configuration)
-            let item = SavedDrink(name: "Saved"); container.mainContext.insert(item); try container.mainContext.save()
+            var draft = DrinkDraft()
+            draft.name = "Saved"; draft.isHomemade = true
+            draft.recipeIngredients = "  80 g oats\n150 ml milk  \n"
+            let item = try DrinkLibrary.save(draft, in: container.mainContext)
             try DrinkLibrary.setArchived(true, for: item, in: container.mainContext)
         }
         let reopened = try LibraryStore.container(configuration: configuration)
-        XCTAssertTrue(try XCTUnwrap(reopened.mainContext.fetch(FetchDescriptor<SavedDrink>()).first).isArchived)
+        let item = try XCTUnwrap(reopened.mainContext.fetch(FetchDescriptor<SavedDrink>()).first)
+        XCTAssertTrue(item.isArchived)
+        XCTAssertTrue(item.isHomemade)
+        XCTAssertTrue(item.hasRecipe)
+        XCTAssertEqual(item.recipeIngredients, "80 g oats\n150 ml milk")
+        XCTAssertNil(item.recipeMethod)
     }
     #if DEBUG
     func testDevelopmentExamplesNeverInventUnknownNutrition() throws {
