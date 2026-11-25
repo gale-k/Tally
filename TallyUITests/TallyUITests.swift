@@ -410,6 +410,7 @@ final class TallyUITests: XCTestCase {
     private func verifySodiumAndSaltEditor(_ arguments: [String] = []) {
         let app = launch(arguments)
         let suffix = arguments.isEmpty ? "" : "-LargeText"
+        let largeText = arguments.contains("--large-text")
         app.tabBars.buttons["Library"].tap()
         app.buttons["addDrink"].tap()
         let name = app.textFields["drinkName"]
@@ -417,16 +418,14 @@ final class TallyUITests: XCTestCase {
         name.tap(); name.typeText("Salty Soup")
         let more = app.buttons["More Nutrition"]
         reveal(more, in: app); more.tap()
-        let unit = app.buttons["sodiumInputUnit"]
-        reveal(unit, in: app); unit.tap()
-        app.buttons["Salt (g)"].tap()
+        selectSodiumUnit("Salt (g)", in: app, largeText: largeText)
         let sodium = app.textFields["nutrition.sodium"]
         reveal(sodium, in: app)
         XCTAssertEqual(sodium.label, "Salt, g")
         sodium.tap(); sodium.typeText("1.25")
         app.buttons["estimate.sodium"].tap()
         capture("Salt-Input" + suffix, app)
-        reveal(unit, in: app); unit.tap(); app.buttons["Sodium (mg)"].tap()
+        selectSodiumUnit("Sodium (mg)", in: app, largeText: largeText)
         XCTAssertEqual(sodium.value as? String, "500")
         XCTAssertEqual(sodium.label, "Sodium, mg")
         app.buttons["saveDrink"].tap()
@@ -438,7 +437,7 @@ final class TallyUITests: XCTestCase {
         reveal(sodium, in: app)
         XCTAssertEqual(sodium.value as? String, "500.0")
         XCTAssertEqual(app.buttons["estimate.sodium"].value as? String, "Estimated")
-        reveal(unit, in: app); unit.tap(); app.buttons["Salt (g)"].tap()
+        selectSodiumUnit("Salt (g)", in: app, largeText: largeText)
         XCTAssertEqual(sodium.value as? String, "1.25")
         app.buttons["saveDrink"].tap()
         XCTAssertTrue(item.waitForExistence(timeout: 5)); item.tap()
@@ -446,10 +445,31 @@ final class TallyUITests: XCTestCase {
         app.buttons["confirmLogDrink"].tap()
         XCTAssertTrue(app.buttons["confirmLogDrink"].waitForNonExistence(timeout: 10))
         app.tabBars.buttons["History"].tap()
-        let event = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "~500 mg sodium")).firstMatch
-        XCTAssertTrue(event.waitForExistence(timeout: 5)); event.tap()
-        XCTAssertTrue(app.staticTexts["Sodium"].exists)
+        let event = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@ AND label CONTAINS %@",
+                                                     "Salty Soup,", "~500 mg sodium")).firstMatch
+        XCTAssertTrue(event.waitForExistence(timeout: 5))
+        // XCTest can find the row while its tap point is under the floating tab bar.
+        let tabBar = app.tabBars.firstMatch
+        reveal(event, in: app, bottomPadding: app.frame.maxY - tabBar.frame.minY + 12)
+        event.tap()
+        XCTAssertTrue(app.navigationBars["Health Entry"].waitForExistence(timeout: 5))
+
+        // The nutrient row exposes its amount and estimate together in the detail's accessibility label.
+        let sodiumDetail = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@ AND label ENDSWITH %@",
+                                                                 "Sodium,", ", ~500 mg, estimated")).firstMatch
+        reveal(sodiumDetail, in: app)
         capture("Sodium-History" + suffix, app)
+    }
+
+    private func selectSodiumUnit(_ title: String, in app: XCUIApplication, largeText: Bool) {
+        let picker = app.buttons["sodiumInputUnit"]
+        // Large text moves the tappable value below the caption. Clear the keyboard's glass edge as well.
+        let offset = largeText ? CGVector(dx: 0.5, dy: 0.8) : CGVector(dx: 0.9, dy: 0.5)
+        reveal(picker, in: app, tapY: offset.dy, bottomPadding: 56)
+        picker.coordinate(withNormalizedOffset: offset).tap()
+        let option = app.buttons[title]
+        XCTAssertTrue(option.waitForExistence(timeout: 5), "The sodium unit picker did not show \(title).")
+        option.tap()
     }
 
     /// A positive sodium amount from Quick Add appears even when sodium is the only selected Today card.
@@ -877,12 +897,14 @@ final class TallyUITests: XCTestCase {
 
     // SwiftUI may call a partially exposed row hittable even when its centre is behind the keyboard.
     // Reveal its actual tap point, including deeper extended nutrition and targets above the current scroll position.
-    private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
+    private func reveal(_ element: XCUIElement, in app: XCUIApplication, tapY: CGFloat = 0.5, bottomPadding: CGFloat = 12) {
         for _ in 0..<20 {
             let top = app.navigationBars.firstMatch.exists ? app.navigationBars.firstMatch.frame.maxY : app.frame.minY
             let bottom = app.keyboards.firstMatch.exists ? app.keyboards.firstMatch.frame.minY : app.frame.maxY
-            if element.exists && element.isHittable && element.frame.midY > top && element.frame.midY < bottom - 12 { return }
-            let scrollBack = element.exists && element.frame.midY <= top
+            let frame = element.exists ? element.frame : .null
+            let targetY = frame.minY + frame.height * tapY
+            if !frame.isNull && element.isHittable && targetY > top && targetY < bottom - bottomPadding { return }
+            let scrollBack = !frame.isNull && targetY <= top
             // A short drag avoids jumping past a field when the keyboard reduces the visible Form height.
             app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: scrollBack ? 0.3 : 0.5)).press(forDuration: 0.05,
                 thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: scrollBack ? 0.5 : 0.3)))

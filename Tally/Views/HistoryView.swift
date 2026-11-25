@@ -61,7 +61,13 @@ private struct HistoryEntriesView: View {
         }
         .refreshable { await health.refresh() }
         .toolbar { if health.isLoading { ProgressView() } }
-        .sheet(item: $selected) { event in NavigationStack { HistoryEventDetail(event: event) } }
+        .sheet(item: $selected) { event in
+            NavigationStack { HistoryEventDetail(event: event) }
+            #if DEBUG
+                // Apply the UI test's appearance and Dynamic Type at the modal root.
+                .modifier(DevelopmentAppearance())
+            #endif
+        }
     }
 }
 
